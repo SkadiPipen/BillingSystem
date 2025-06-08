@@ -92,6 +92,9 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         super().__init__()
         self.parent = parent
         
+        # Store the username from parent
+        self.username = parent if isinstance(parent, str) else "System"
+        
         # Initialize pagination variables before setup_ui
         self.rows_per_page = 10
         self.current_page = 1
