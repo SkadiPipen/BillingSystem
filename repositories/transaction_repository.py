@@ -1,5 +1,6 @@
 import psycopg2
 from database.Database import DBConnector
+from datetime import date
 
 class TransactionRepository:
     def __init__(self):
@@ -57,26 +58,33 @@ class TransactionRepository:
             if 'conn' in locals():
                 conn.close()
 
-    def create_transaction(self, billing_id, trans_status, trans_payment_date, trans_total_amount, payment_id, client_id, user_id):
+
+
+
+    def create_transaction(self, billing_id, trans_status, trans_payment_date, trans_total_amount,
+                       client_id, reading_id):
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO TRANSACTIONS (
                 BILLING_ID, TRANS_STATUS, TRANS_PAYMENT_DATE, TRANS_TOTAL_AMOUNT,
-                PAYMENT_ID, TRANS_CODE, CLIENT_ID, USER_ID
+                TRANS_CODE, CLIENT_ID, READING_ID
             ) VALUES (
-                %s, %s, %s, %s, %s,
-                'TR-' || LPAD(nextval('trans_id_seq')::text, 5, '0'), %s, %s       
+                %s, %s, %s, %s,
+                'TR-' || LPAD(nextval('trans_id_seq')::text, 5, '0'), %s, %s
             )
             RETURNING TRANS_ID;
         """, (
-            billing_id, trans_status, trans_payment_date, trans_total_amount, payment_id, client_id, user_id 
+            billing_id, trans_status, trans_payment_date, trans_total_amount,
+            client_id, reading_id
         ))
         new_id = cursor.fetchone()
         conn.commit()
         cursor.close()
         conn.close()
         return new_id
+
+
 
     def get_all_transaction_logs(self):
         try:
@@ -117,3 +125,27 @@ class TransactionRepository:
                 cursor.close()
             if 'conn' in locals():
                 conn.close()
+
+    def get_transaction_id_by_billing_id(self, billing_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT TRANS_ID FROM TRANSACTIONS WHERE BILLING_ID = %s", (billing_id,))
+        result = cursor.fetchone()
+        conn.close()
+        return result[0] if result else None
+
+    from datetime import date
+
+    def update_transaction_status(self, transaction_id, new_status):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        payment_date = date.today()
+        cursor.execute("""
+            UPDATE TRANSACTIONS 
+            SET TRANS_STATUS = %s, TRANS_PAYMENT_DATE = %s
+            WHERE TRANS_ID = %s
+        """, (new_status, payment_date, transaction_id))
+        conn.commit()
+        conn.close()
+
+
