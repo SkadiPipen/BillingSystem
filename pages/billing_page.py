@@ -108,18 +108,33 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         self.billing_table.setCellWidget(row, column, scrollable_widget)
 
     def create_action_cell(self, row, billing_data):
-        """Create action cell with print button, view, issue, and void buttons based on the bill's status"""
         action_widget = QtWidgets.QWidget()
         action_layout = QtWidgets.QHBoxLayout(action_widget)
         action_layout.setContentsMargins(5, 5, 5, 5)
         action_layout.setAlignment(QtCore.Qt.AlignCenter)
 
-        # Extract status
         status = billing_data[7]
 
-        if status == "PRINTED":
-            # Display buttons for viewing bill info, issue, and void
-            view_btn = QtWidgets.QPushButton("📄 View Bill")
+        # Print button for TO BE PRINTED
+        if status == "TO BE PRINTED":
+            print_btn = QtWidgets.QPushButton("🖨 Print")
+            print_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #45A049;
+                }
+            """)
+            print_btn.clicked.connect(lambda _, data=billing_data: self.print_bill(data))
+            action_layout.addWidget(print_btn)
+
+        # View button for PRINTED
+        if status in ["PRINTED", "VOID", "PENDING PAYMENT"]:
+            view_btn = QtWidgets.QPushButton("📄 View")
             view_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #2196F3;
@@ -131,16 +146,30 @@ class EmployeeBillingPage(QtWidgets.QWidget):
                     background-color: #1976D2;
                 }
             """)
-            
-            view_btn.clicked.connect(lambda: self.view_bill(billing_data))
+            view_btn.clicked.connect(lambda _, data=billing_data: self.view_bill(data))
             action_layout.addWidget(view_btn)
 
-            # Add other buttons (e.g., Issue and Void) here if needed
-            
-        else:
-            # Regular print button
-            print_btn = QtWidgets.QPushButton("🖨 Print")
-            print_btn.setStyleSheet("""
+        # Edit button for TO BE PRINTED and PRINTED
+        if status in ["TO BE PRINTED", "PRINTED"]:
+            edit_btn = QtWidgets.QPushButton("✏️ Edit")
+            edit_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FFB74D;
+                    color: white;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #FFA726;
+                }
+            """)
+            edit_btn.clicked.connect(lambda _, data=billing_data: self.edit_billing(data))
+            action_layout.addWidget(edit_btn)
+
+        # Reissue button for PENDING PAYMENT
+        if status == "PENDING PAYMENT":
+            paid_btn = QtWidgets.QPushButton("💰 Paid")
+            paid_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #4CAF50;
                     color: white;
@@ -148,13 +177,290 @@ class EmployeeBillingPage(QtWidgets.QWidget):
                     border-radius: 4px;
                 }
                 QPushButton:hover {
-                    background-color: #45a049;
+                    background-color: #388E3C;
                 }
             """)
-            print_btn.clicked.connect(lambda: self.print_bill(billing_data))
-            action_layout.addWidget(print_btn)
+            paid_btn.clicked.connect(lambda _, data=billing_data: self.mark_billing_as_paid(data))
+            action_layout.addWidget(paid_btn)
+
+            reissue_btn = QtWidgets.QPushButton("♻️ Reissue")
+            reissue_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FF9800;
+                    color: white;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #F57C00;
+                }
+            """)
+            reissue_btn.clicked.connect(lambda _, data=billing_data: self.reissue_billing(data))
+            action_layout.addWidget(reissue_btn)
+
+            void_btn = QtWidgets.QPushButton("🚫 Void")
+            void_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #BDBDBD;
+                    color: white;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #9E9E9E;
+                }
+            """)
+            void_btn.clicked.connect(lambda _, data=billing_data: self.void_billing(data))
+            action_layout.addWidget(void_btn)
+
+
+        # Delete button for TO BE PRINTED
+        if status == "TO BE PRINTED":
+            delete_btn = QtWidgets.QPushButton("❌ Delete")
+            delete_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #E57373;
+                    color: white;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #EF5350;
+                }
+            """)
+            delete_btn.clicked.connect(lambda _, data=billing_data: self.delete_billing(data))
+            action_layout.addWidget(delete_btn)
+
+        # Void button for PRINTED
+        if status == "PRINTED":
+            void_btn = QtWidgets.QPushButton("🚫 Void")
+            void_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #BDBDBD;
+                    color: white;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #9E9E9E;
+                }
+            """)
+            void_btn.clicked.connect(lambda _, data=billing_data: self.void_billing(data))
+            action_layout.addWidget(void_btn)
 
         self.billing_table.setCellWidget(row, 8, action_widget)
+
+    def mark_billing_as_paid(self, billing_data):
+        reply = QtWidgets.QMessageBox.question(
+            self, "Confirm Payment",
+            f"Mark billing {billing_data[0]} and its transaction as PAID?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+        )
+        if reply == QtWidgets.QMessageBox.Yes:
+            try:
+                backend = adminPageBack()
+                billing_code = billing_data[0]
+                billing_id = backend.get_billing_id(billing_code)
+
+                # Update billing status
+                backend.update_billing_status(billing_id, "PAID")
+
+                # Get the transaction ID linked to the billing
+                transaction_id = backend.get_transaction_id_by_billing_id(billing_id)
+                if transaction_id:
+                    backend.update_transaction_status(transaction_id, "PAID")
+
+                QtWidgets.QMessageBox.information(self, "Success", f"Billing {billing_code} and its transaction marked as PAID.")
+                self.populate_table(backend.fetch_billing())
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "Error", f"Failed to update payment status: {e}")
+
+
+    # Implement edit, delete, and void methods
+    def edit_billing(self, billing_data):
+        backend = adminPageBack()
+        billing_code = billing_data[0]
+        billing_id = backend.get_billing_id(billing_code)
+        billing_details = backend.get_billing_by_id(billing_id)
+
+        if not billing_details:
+            QtWidgets.QMessageBox.warning(self, "Edit Billing", f"No billing data found for {billing_code}")
+            return
+
+        self.show_edit_billing(existing_data=billing_details)
+
+    
+    def show_edit_billing(self, existing_data):
+        if not existing_data or len(existing_data) == 0:
+            QtWidgets.QMessageBox.warning(self, "Edit Billing", "No billing data available for editing.")
+            return
+
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle("Edit Billing")
+        dialog.setFixedSize(1000, 700)
+        dialog.setStyleSheet("background-color: #C9EBCB;")
+
+        layout = QtWidgets.QVBoxLayout(dialog)
+        layout.setContentsMargins(30, 5, 30, 5)
+
+        title = QtWidgets.QLabel("EDIT BILLING INFORMATION")
+        title.setStyleSheet("font-size: 20px; padding: 10px;")
+        title.setAlignment(QtCore.Qt.AlignCenter)
+        layout.addWidget(title)
+
+        form_layout = QtWidgets.QGridLayout()
+        form_layout.setHorizontalSpacing(40)
+        form_layout.setVerticalSpacing(20)
+
+        input_style = """
+            QLineEdit, QDateEdit, QComboBox {
+                font-family: 'Arial';
+                font-size: 14px;
+                padding: 8px;
+                border: 1px solid #bdc3c7;
+                border-radius: 4px;
+                background-color: #ffffff;
+            }
+        """
+        readonly_style = """
+            QLineEdit {
+                font-family: 'Arial';
+                font-size: 14px;
+                padding: 8px;
+                border: 1px solid #bdc3c7;
+                border-radius: 4px;
+                background-color: #e0e0e0;
+                color: #555555;
+            }
+        """
+
+        billing_id, billing_due_date, billing_total_amount, cubic_meter_val, reading_id, client_id, categ_id, billing_date, billing_code, billing_status, issued_date, amount_val, subscribe_capital_val, late_payment_val, penalty_val, total_charge_val = existing_data
+
+        subscribe_capital = QtWidgets.QLineEdit(str(subscribe_capital_val))
+        subscribe_capital.setStyleSheet(input_style)
+
+        late_payment = QtWidgets.QLineEdit(str(late_payment_val))
+        late_payment.setStyleSheet(input_style)
+
+        penalty = QtWidgets.QLineEdit(str(penalty_val))
+        penalty.setStyleSheet(input_style)
+
+        total_charge = QtWidgets.QLineEdit(str(total_charge_val))
+        total_charge.setStyleSheet(readonly_style)
+        total_charge.setReadOnly(True)
+
+        amount = QtWidgets.QLineEdit(str(amount_val))
+        amount.setStyleSheet(readonly_style)
+        amount.setReadOnly(True)
+
+        total_bill = QtWidgets.QLineEdit(str(billing_total_amount))
+        total_bill.setStyleSheet(readonly_style)
+        total_bill.setReadOnly(True)
+
+        billing_due = QtWidgets.QDateEdit()
+        billing_due.setDate(billing_due_date)
+        billing_due.setCalendarPopup(True)
+        billing_due.setStyleSheet(input_style)
+
+        # Layout adjustments based on your screenshot
+        form_layout.addWidget(QtWidgets.QLabel("SUBSCRIBE CAPITAL:"), 0, 1)
+        form_layout.addWidget(subscribe_capital, 1, 1)
+        form_layout.addWidget(QtWidgets.QLabel("LATE PAYMENT:"), 2, 1)
+        form_layout.addWidget(late_payment, 3, 1)
+        form_layout.addWidget(QtWidgets.QLabel("PENALTY:"), 4, 1)
+        form_layout.addWidget(penalty, 5, 1)
+        form_layout.addWidget(QtWidgets.QLabel("TOTAL CHARGE:"), 6, 1)
+        form_layout.addWidget(total_charge, 7, 1)
+        form_layout.addWidget(QtWidgets.QLabel("AMOUNT:"), 0, 0)
+        form_layout.addWidget(amount, 1, 0)
+        form_layout.addWidget(QtWidgets.QLabel("TOTAL BILL:"), 2, 0)
+        form_layout.addWidget(total_bill, 3, 0)
+        form_layout.addWidget(QtWidgets.QLabel("DUE DATE:"), 4, 0)
+        form_layout.addWidget(billing_due, 5, 0)
+
+        layout.addLayout(form_layout)
+
+        button_container = QtWidgets.QWidget()
+        button_layout = QtWidgets.QHBoxLayout(button_container)
+        button_layout.setAlignment(QtCore.Qt.AlignRight)
+
+        cancel_btn = QtWidgets.QPushButton("Cancel")
+        cancel_btn.clicked.connect(dialog.reject)
+        cancel_btn.setStyleSheet("padding:8px; background-color: #95a5a6; color:white; border-radius:4px;")
+
+        save_btn = QtWidgets.QPushButton("Save Changes")
+        save_btn.setStyleSheet("padding:8px; background-color: #27ae60; color:white; border-radius:4px;")
+
+        button_layout.addWidget(cancel_btn)
+        button_layout.addWidget(save_btn)
+        layout.addWidget(button_container)
+
+        # Real-time update logic for total_charge and total_bill
+        def update_totals():
+            try:
+                sub_cap = float(subscribe_capital.text()) if subscribe_capital.text() else 0
+                late_pay = float(late_payment.text()) if late_payment.text() else 0
+                pen = float(penalty.text()) if penalty.text() else 0
+                charge_total = sub_cap + late_pay + pen
+                total_charge.setText(f"{charge_total:.2f}")
+
+                amt = float(amount.text()) if amount.text() else 0
+                total_bill_val = amt + charge_total
+                total_bill.setText(f"{total_bill_val:.2f}")
+            except ValueError:
+                total_charge.setText("0.00")
+                total_bill.setText("0.00")
+
+        subscribe_capital.textChanged.connect(update_totals)
+        late_payment.textChanged.connect(update_totals)
+        penalty.textChanged.connect(update_totals)
+
+        def save_edited_billing():
+            backend = adminPageBack()
+            updated_total = float(total_bill.text())
+            updated_due = billing_due.date().toPyDate()
+            backend.update_billing(
+                billing_id, updated_total, updated_due,
+                float(subscribe_capital.text()),
+                float(late_payment.text()),
+                float(penalty.text()),
+                float(total_charge.text())
+            )
+            QtWidgets.QMessageBox.information(dialog, "Updated", "Billing updated successfully.")
+            dialog.accept()
+            self.populate_table(backend.fetch_billing())
+
+        save_btn.clicked.connect(save_edited_billing)
+
+        dialog.exec_()
+
+
+
+
+    def delete_billing(self, billing_data):
+        reply = QtWidgets.QMessageBox.question(
+            self, "Confirm Deletion",
+            f"Are you sure you want to delete billing {billing_data[0]}?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+        )
+        if reply == QtWidgets.QMessageBox.Yes:
+            adminPageBack().delete_billing(billing_data[0])
+            QtWidgets.QMessageBox.information(self, "Deleted", f"Billing {billing_data[0]} deleted.")
+            self.populate_table(adminPageBack().fetch_billing())
+
+
+    def void_billing(self, billing_data):
+        reply = QtWidgets.QMessageBox.question(
+            self, "Confirm Void",
+            f"Are you sure you want to void billing {billing_data[0]}?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+        )
+        if reply == QtWidgets.QMessageBox.Yes:
+            adminPageBack().update_billing_status(adminPageBack().get_billing_id(billing_data[0]), "VOID")
+            QtWidgets.QMessageBox.information(self, "Voided", f"Billing {billing_data[0]} voided.")
+            self.populate_table(adminPageBack().fetch_billing())
+
+
 
 
 
@@ -507,25 +813,48 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         self.loading.close()
         self.preview_window = self.ViewBill(merged_pdf_path)
 
-        # Mark as Printed button
-        mark_btn = QtWidgets.QPushButton("✅ Issue")
-        mark_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #43A047;
-                color: white;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #2E7D32;
-            }
-        """)
-        # Only 1 bill passed here
-        mark_btn.clicked.connect(lambda: self.mark_as_printed(self.preview_window, [self.filtered_data[(self.current_page - 1) * self.rows_per_page]]))
-        
-        self.preview_window.layout().addWidget(mark_btn)
+        billing_data = self.filtered_data[(self.current_page - 1) * self.rows_per_page]
+
+        billing_status = billing_data[7]  # Status column
+
+        if billing_status not in ["VOID", "PENDING PAYMENT"]:
+            # Issue Button
+            issue_btn = QtWidgets.QPushButton("✅ Issue")
+            issue_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #43A047;
+                    color: white;
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #2E7D32;
+                }
+            """)
+            issue_btn.clicked.connect(lambda: self.confirm_issue_bill(self.preview_window, billing_data))
+            self.preview_window.layout().addWidget(issue_btn)
+
+            # Void Button
+            void_btn = QtWidgets.QPushButton("🚫 Void")
+            void_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #E53935;
+                    color: white;
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #C62828;
+                }
+            """)
+            void_btn.clicked.connect(lambda: self.confirm_void_bill(self.preview_window, billing_data))
+            self.preview_window.layout().addWidget(void_btn)
+
+
         self.preview_window.show()
+
 
     def on_view_generated(self, merged_pdf_path):
         self.loading.close()
@@ -552,6 +881,70 @@ class EmployeeBillingPage(QtWidgets.QWidget):
 
         self.preview_window.layout().addWidget(mark_all_btn)
         self.preview_window.show()
+
+    
+    def confirm_issue_bill(self, preview_window, billing_data):
+        reply = QtWidgets.QMessageBox.question(
+            preview_window,
+            "Confirm Issue",
+            f"Are you sure you want to issue billing {billing_data[0]} and mark it as PENDING PAYMENT?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+        )
+        if reply == QtWidgets.QMessageBox.Yes:
+            try:
+                backend = adminPageBack()
+                billing_code = billing_data[0]
+                billing_id = backend.get_billing_id(billing_code)
+                bill_details = backend.get_billing_by_id(billing_id)
+
+                from datetime import date
+                today = date.today()
+
+                # 🔄 Update status and issued date
+                backend.update_billing_status(billing_id, "PENDING PAYMENT")
+                backend.update_billing_issued_date(billing_id, today)
+
+                # ✅ Create Transaction
+                trans_status = "PENDING"
+                trans_payment_date = None
+                trans_total_amount = bill_details[2]  # billing_total
+                client_id = bill_details[5]
+                reading_id = bill_details[4]  # assuming this is the reading_id
+
+                backend.add_transaction(
+                    billing_id, trans_status, trans_payment_date, trans_total_amount,
+                    client_id, reading_id
+                )
+
+                QtWidgets.QMessageBox.information(preview_window, "Issued", f"Billing {billing_code} marked as PENDING PAYMENT and transaction created.")
+                preview_window.close()
+                self.populate_table(backend.fetch_billing())
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(preview_window, "Error", f"Failed to issue billing: {e}")
+
+
+
+
+    def confirm_void_bill(self, preview_window, billing_data):
+        reply = QtWidgets.QMessageBox.question(
+            preview_window,
+            "Confirm Void",
+            f"Are you sure you want to void billing {billing_data[0]}?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+        )
+        if reply == QtWidgets.QMessageBox.Yes:
+            try:
+                admin = adminPageBack()
+                billing_id = admin.get_billing_id(billing_data[0])
+                admin.update_billing_status(billing_id, "VOID")
+
+                QtWidgets.QMessageBox.information(preview_window, "Voided", f"Billing {billing_data[0]} has been voided.")
+                preview_window.close()  # Only close after successful action
+                self.populate_table(admin.fetch_billing())
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(preview_window, "Error", f"Failed to void billing: {e}")
+
+
 
     
 
