@@ -18,10 +18,6 @@ from PyQt5.QtWidgets import QLabel, QScrollArea
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtCore import QThreadPool
-
-
-
-
 from backend.adminBack import adminPageBack
 
 from PyQt5.QtCore import QRunnable, QThreadPool, QObject, pyqtSignal

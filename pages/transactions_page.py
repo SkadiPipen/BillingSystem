@@ -371,7 +371,7 @@ class TransactionsPage(QtWidgets.QWidget):
               <th style="white-space: nowrap; text-align: left;">Payment Date</th>
               <th style="white-space: nowrap; text-align: left;">Client No.</th>
               <th style="white-space: nowrap; text-align: left;">Client Name</th>
-              <th style="white-space: nowrap; text-align: left;">Reading</th>
+              <th style="white-space: nowrap; text-align: left;">Employee</th>
               <th style="white-space: nowrap; text-align: left;">Due Date</th>
               <th style="white-space: nowrap; text-align: right;">Consumption</th>
               <th style="white-space: nowrap; text-align: left;">Status</th>
@@ -612,43 +612,54 @@ class TransactionsPage(QtWidgets.QWidget):
             trans_payment_date = transaction[1]
             client_number = transaction[2]
             client_name = transaction[3]
-            reading_id = transaction[4]  # Use reading_id instead of user_name
+            reading_id = transaction[4]
             billing_consumption = transaction[5]
             billing_total = transaction[6]
             billing_due = transaction[7]
             trans_status = transaction[8]
             reading_date = transaction[9] if len(transaction) > 9 else "N/A"
 
-            # Retrieve reading info
+            # Get reading text
             try:
                 reading = IadminPageBack.get_reading_by_id(reading_id)
                 reading_text = f"Previous: {reading[0]:,.2f}\nCurrent: {reading[1]:,.2f}" if reading else "N/A"
             except Exception as e:
                 reading_text = "Error"
 
+            # Display date logic
+            status_str = str(trans_status).strip().upper() if trans_status else ""
+            payment_display = trans_payment_date if status_str == "PAID" else reading_date
+
+            # Display table cells
             self.create_scrollable_cell(table_row, 0, str(trans_code))
-            self.create_scrollable_cell(table_row, 1,
-                                        str(trans_payment_date if trans_status == 'PAID' else reading_date))
+            self.create_scrollable_cell(table_row, 1, str(payment_display))
             self.create_scrollable_cell(table_row, 2, str(client_number))
             self.create_scrollable_cell(table_row, 3, str(client_name))
             self.create_scrollable_cell(table_row, 4, reading_text)
-            self.create_scrollable_cell(table_row, 5, str(billing_due))
-            self.create_scrollable_cell(table_row, 6, f"{billing_consumption:,.2f}")
+            self.create_scrollable_cell(table_row, 5, str(billing_due))  # DUE DATE here
+            self.create_scrollable_cell(table_row, 6,
+                                        f"{float(billing_consumption):,.2f}" if billing_consumption else "0.00")  # CONSUMPTION
 
-            status_label = QtWidgets.QLabel(trans_status)
+            # Correct STATUS in Column 7
+            status_label = QtWidgets.QLabel(str(trans_status))
             status_label.setStyleSheet(
-                f"color: {'#4CAF50' if trans_status == 'PAID' else '#E57373'}; font-weight: bold;")
+                f"color: {'#4CAF50' if str(trans_status).upper() == 'PAID' else '#E57373'}; font-weight: bold;")
             self.transaction_table.setCellWidget(table_row, 7, status_label)
 
-            self.create_scrollable_cell(table_row, 8, f"₱{billing_total:,.2f}")
+            # Correct AMOUNT in Column 8
+            try:
+                amount = f"₱{float(billing_total):,.2f}" if billing_total else "₱0.00"
+            except:
+                amount = "₱0.00"
+            self.create_scrollable_cell(table_row, 8, amount)
 
-        # Summary section
-        paid_con = pend_con = paid_amt = pend_amt = 0
+        # Summary Calculations
+        paid_con = pend_con = paid_amt = pend_amt = 0.0
         for trans in rows_to_show:
             try:
                 status = str(trans[8]).strip().upper()
-                con = float(trans[5])
-                amt = float(trans[6])
+                con = float(trans[5]) if trans[5] else 0.0
+                amt = float(trans[6]) if trans[6] else 0.0
                 if status == "PAID":
                     paid_con += con
                     paid_amt += amt
@@ -685,6 +696,7 @@ class TransactionsPage(QtWidgets.QWidget):
             add_summary_row(summary_start_row + 2, "Grand Total Consumption", total_con, "Grand Total Amount",
                             total_amt)
 
+        # Style the summary rows
         for row in range(summary_start_row, self.transaction_table.rowCount()):
             for col in range(5, 9):
                 item = self.transaction_table.item(row, col)
