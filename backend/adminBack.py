@@ -189,6 +189,11 @@ class adminPageBack:
         meter_repository = MeterRepository()
         return meter_repository.get_meter_previous_reading(meter_id)
 
+    def get_reading_by_id(self, reading_id):
+        reading_repository = ReadingRepository()
+        result = reading_repository.get_reading_by_id(reading_id)
+        return result[0] if result else None  # return (reading_prev, reading_current)
+
     def get_billing_id(self, billing_code):
         billing_repository = BillingRepository()
         return billing_repository.get_billing_id(billing_code)

@@ -21,30 +21,32 @@ class TransactionRepository:
         conn.close()
         return transaction
 
-
-    def get_all_transaction(self): 
+    def get_all_transaction(self):
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT t.TRANS_CODE, t.TRANS_PAYMENT_DATE, c.CLIENT_NUMBER, c.CLIENT_NAME, u.USER_NAME,
-                    b.BILLING_CONSUMPTION, b.BILLING_TOTAL, b.BILLING_DUE, t.TRANS_STATUS
-                FROM TRANSACTIONS as t
-                JOIN CLIENT as c ON t.CLIENT_ID = c.CLIENT_ID
-                JOIN BILLING as b ON t.BILLING_ID = b.BILLING_ID
-                JOIN USERS as u ON t.user_id = u.user_id
-                ORDER BY TRANS_ID ASC
+                SELECT 
+                    t.TRANS_CODE, 
+                    t.TRANS_PAYMENT_DATE, 
+                    c.CLIENT_NUMBER, 
+                    c.CLIENT_NAME, 
+                    u.USER_NAME,
+                    b.BILLING_CONSUMPTION, 
+                    b.BILLING_TOTAL, 
+                    b.BILLING_DUE, 
+                    t.TRANS_STATUS,
+                    r.READING_DATE
+                FROM TRANSACTIONS AS t
+                JOIN CLIENT AS c ON t.CLIENT_ID = c.CLIENT_ID
+                JOIN BILLING AS b ON t.BILLING_ID = b.BILLING_ID
+                JOIN USERS AS u ON t.USER_ID = u.USER_ID
+                LEFT JOIN READING AS r ON t.READING_ID = r.READING_ID
+                ORDER BY t.TRANS_ID ASC
             """)
             transactions = cursor.fetchall()
 
-            formatted_transactions = [
-                (
-                    trans_code, trans_payment_date, client_number, client_name, user_name, billing_consumption, billing_total, billing_due, trans_status
-                )
-                for  trans_code, trans_payment_date, client_number, client_name, user_name, billing_consumption, billing_total, billing_due, trans_status in transactions
-            ]
-
-            return formatted_transactions
+            return transactions
 
         except Exception as e:
             print(f"Database error: {e}")
@@ -55,6 +57,7 @@ class TransactionRepository:
                 cursor.close()
             if 'conn' in locals():
                 conn.close()
+
 
 
 

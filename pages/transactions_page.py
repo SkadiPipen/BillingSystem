@@ -7,7 +7,14 @@ import math
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from PyQt5 import QtCore, QtGui, QtWidgets
 from backend.adminBack import adminPageBack
+from PyQt5.QtPrintSupport import QPrinter, QPrintPreviewDialog
+from PyQt5.QtGui import QTextDocument
+import base64
 
+def image_to_base64(path):
+    with open(path, "rb") as image_file:
+        encoded = base64.b64encode(image_file.read()).decode("utf-8")
+        return f"data:image/png;base64,{encoded}"
 
 class TransactionsPage(QtWidgets.QWidget):
     def __init__(self, parent=None):
@@ -22,7 +29,7 @@ class TransactionsPage(QtWidgets.QWidget):
     def create_scrollable_cell(self, row, column, text):
         scrollable_widget = ScrollableTextWidget(text)
         self.transaction_table.setCellWidget(row, column, scrollable_widget)
-        
+
     def setup_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -32,7 +39,7 @@ class TransactionsPage(QtWidgets.QWidget):
         header_panel.setStyleSheet("background-color: #f5f5f5; border-bottom: 1px solid #ddd;")
         header_layout = QtWidgets.QVBoxLayout(header_panel)
         header_layout.setContentsMargins(20, 15, 20, 15)
-        
+
         # Header with title, search bar, and dropdown
         controls_layout = QtWidgets.QHBoxLayout()
         title = QtWidgets.QLabel("TRANSACTIONS")
@@ -46,9 +53,17 @@ class TransactionsPage(QtWidgets.QWidget):
 
         # Search container
         search_container = QtWidgets.QHBoxLayout()
-
         self.filter_combo = QtWidgets.QComboBox()
-        self.filter_combo.addItems(["Transaction Number", "Client Name", "Employee", "Date"])
+        self.filter_combo.addItems([
+            "Transaction Number",
+            "Client Name",
+            "Employee",
+            "Date",
+            "Status: Paid",
+            "Status: Pending",
+            "Status: Voided"
+        ])
+
         self.filter_combo.setStyleSheet("""
             QComboBox {
                 padding: 8px;
@@ -102,7 +117,8 @@ class TransactionsPage(QtWidgets.QWidget):
         """)
         self.transaction_type_combo.currentIndexChanged.connect(self.filter_table)
         controls_layout.addWidget(self.transaction_type_combo)
-        
+
+
         header_layout.addLayout(controls_layout)
         layout.addWidget(header_panel)
 
@@ -133,13 +149,14 @@ class TransactionsPage(QtWidgets.QWidget):
         """)
         self.transaction_table.setColumnCount(9)
         self.transaction_table.setHorizontalHeaderLabels([
-            "TRANSACTION NUMBER", "PAYMENT DATE", "CLIENT NUMBER", "CLIENT NAME", "EMPLOYEE", "CONSUMPTION", "AMOUNT", "DUE DATE", "STATUS"
+            "TRANSACTION NUMBER", "PAYMENT DATE", "CLIENT NUMBER", "CLIENT NAME", "READING", "DUE DATE", "CONSUMPTION",
+            "STATUS", "AMOUNT"
         ])
-        
+
         # Set the table to fill all available space
         self.transaction_table.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.transaction_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        
+
         # Enable horizontal scrollbar
         self.transaction_table.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.transaction_table.setWordWrap(False)
@@ -147,7 +164,7 @@ class TransactionsPage(QtWidgets.QWidget):
         # Fetch all transactions data
         IadminPageBack = adminPageBack()
         self.all_transactions_data = IadminPageBack.fetch_transactions()
-        
+
         self.transaction_table.setSelectionBehavior(QtWidgets.QTableWidget.SelectRows)
         self.transaction_table.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
         self.transaction_table.verticalHeader().setVisible(False)
@@ -158,39 +175,41 @@ class TransactionsPage(QtWidgets.QWidget):
 
         # Add table to the main layout with full expansion
         layout.addWidget(self.transaction_table)
-        
+
+        # Label to display total amount based on filtered status
+
         # Add pagination controls
         pagination_layout = QtWidgets.QHBoxLayout()
         pagination_layout.setAlignment(QtCore.Qt.AlignCenter)
-        
+
         # First page button
         self.first_page_btn = QtWidgets.QPushButton("⏮ First")
         self.first_page_btn.clicked.connect(self.go_to_first_page)
-        
+
         # Previous page button
         self.prev_page_btn = QtWidgets.QPushButton("◀ Previous")
         self.prev_page_btn.clicked.connect(self.go_to_prev_page)
-        
+
         # Page indicator
         self.page_indicator = QtWidgets.QLabel("Page 1 of 1")
         self.page_indicator.setAlignment(QtCore.Qt.AlignCenter)
         self.page_indicator.setStyleSheet("font-weight: bold; min-width: 150px;")
-        
+
         # Next page button
         self.next_page_btn = QtWidgets.QPushButton("Next ▶")
         self.next_page_btn.clicked.connect(self.go_to_next_page)
-        
+
         # Last page button
         self.last_page_btn = QtWidgets.QPushButton("Last ⏭")
         self.last_page_btn.clicked.connect(self.go_to_last_page)
-        
+
         # Records per page selector
         self.page_size_label = QtWidgets.QLabel("Records per page:")
         self.page_size_combo = QtWidgets.QComboBox()
         self.page_size_combo.addItems(["5", "10", "20", "50", "100"])
         self.page_size_combo.setCurrentText(str(self.records_per_page))
         self.page_size_combo.currentTextChanged.connect(self.change_page_size)
-        
+
         # Style for pagination buttons
         pagination_btn_style = """
             QPushButton {
@@ -208,12 +227,12 @@ class TransactionsPage(QtWidgets.QWidget):
                 color: #9E9E9E;
             }
         """
-        
+
         self.first_page_btn.setStyleSheet(pagination_btn_style)
         self.prev_page_btn.setStyleSheet(pagination_btn_style)
         self.next_page_btn.setStyleSheet(pagination_btn_style)
         self.last_page_btn.setStyleSheet(pagination_btn_style)
-        
+
         # Add pagination controls to layout
         pagination_layout.addWidget(self.first_page_btn)
         pagination_layout.addWidget(self.prev_page_btn)
@@ -223,11 +242,212 @@ class TransactionsPage(QtWidgets.QWidget):
         pagination_layout.addSpacing(20)
         pagination_layout.addWidget(self.page_size_label)
         pagination_layout.addWidget(self.page_size_combo)
-        
+
         layout.addLayout(pagination_layout)
-        
+
         # Calculate total pages and update table
         self.update_pagination()
+
+        # Create sub-layout for search and buttons
+        search_add_layout = QtWidgets.QHBoxLayout()
+
+        # Add existing widgets
+        search_add_layout.addLayout(search_container)
+
+        # Add Print Preview Button (styled like Add Customer)
+        print_btn = QtWidgets.QPushButton("PRINT PREVIEW", icon=QtGui.QIcon("../images/print.png"))
+        print_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #E57373;
+                color: white;
+                padding: 8px 15px;
+                border-radius: 4px;
+                font-family: 'Roboto', sans-serif;
+            }
+            QPushButton:hover {
+                background-color: #C62828;
+            }
+        """)
+        print_btn.clicked.connect(self.show_print_preview)
+        search_add_layout.addWidget(print_btn)
+
+        # Add the layout to the controls header
+        controls_layout.addLayout(search_add_layout)
+
+
+
+
+    def get_filtered_status_label(self):
+        # Check if all visible rows are PAID or PENDING
+        paid_count = 0
+        pending_count = 0
+        visible_index = 0
+        start = (self.current_page - 1) * self.records_per_page + 1
+        end = self.current_page * self.records_per_page
+
+        for row_index, transaction in enumerate(self.all_transactions_data):
+            if not self.is_row_filtered(row_index):
+                visible_index += 1
+                if start <= visible_index <= end:
+                    status = str(transaction[8]).upper()
+                    if status == "PAID":
+                        paid_count += 1
+                    elif status == "PENDING":
+                        pending_count += 1
+
+        if paid_count > 0 and pending_count == 0:
+            return "PAID"
+        elif pending_count > 0 and paid_count == 0:
+            return "PENDING"
+        elif paid_count == 0 and pending_count == 0:
+            return "None"
+        else:
+            return "Mixed"
+
+    def show_print_preview(self):
+        from backend.adminBack import adminPageBack
+        IadminPageBack = adminPageBack()
+
+        logo_path = os.path.join(os.path.dirname(__file__), "..", "images", "logosowbasco.png")
+        logo_base64 = image_to_base64(logo_path)
+
+        visible_data = []
+        visible_index = 0
+        start = (self.current_page - 1) * self.records_per_page + 1
+        end = self.current_page * self.records_per_page
+
+        for row_index, transaction in enumerate(self.all_transactions_data):
+            if not self.is_row_filtered(row_index):
+                visible_index += 1
+                if start <= visible_index <= end:
+                    visible_data.append(transaction)
+
+        selected_type = self.transaction_type_combo.currentText()
+        if selected_type == "Daily Transaction":
+            report_title = "Daily Transactions"
+        elif selected_type == "Monthly Transaction":
+            report_title = "Monthly Transactions"
+        else:
+            report_title = "Transaction Report"
+
+        paid_con = pend_con = 0.0
+        paid_amt = pend_amt = 0.0
+
+        html = f"""
+        <table width="100%" style="border-collapse: collapse;">
+          <tr>
+            <td style="width: 1px; padding-right: 10px; vertical-align: top;">
+              <img src="{logo_base64}" width="120">
+            </td>
+            <td style="text-align: center;">
+              <div style="font-family: Arial, sans-serif; line-height: 1.1;">
+                <div style="font-size: 14pt; font-weight: bold;">Southwestern Barangays Water Service Cooperative II</div>
+                <div style="font-size: 11pt; font-weight: bold;">(SOWBASCO)</div>
+                <div style="font-size: 10pt;">Consuelo, San Francisco, Cebu</div>
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <hr style="margin: 8px 0;">
+        <div style="text-align: center; font-weight: bold; font-size: 11pt; margin-bottom: 10px;">{report_title}</div>
+
+        <table border="1" cellspacing="0" cellpadding="5"
+       style="width: 100%; table-layout: fixed; font-size:8pt; font-family: Arial; border-collapse: collapse;">
+          <colgroup>
+            <col style="width: 11%;">
+            <col style="width: 11%;">
+            <col style="width: 11%;">
+            <col style="width: 11%;">
+            <col style="width: 11%;">
+            <col style="width: 11%;">
+            <col style="width: 11%;">
+            <col style="width: 11%;">
+            <col style="width: 12%;">
+          </colgroup>
+          <thead>
+            <tr style="height: 30px;">
+              <th style="white-space: nowrap; text-align: left;">Transaction No.</th>
+              <th style="white-space: nowrap; text-align: left;">Payment Date</th>
+              <th style="white-space: nowrap; text-align: left;">Client No.</th>
+              <th style="white-space: nowrap; text-align: left;">Client Name</th>
+              <th style="white-space: nowrap; text-align: left;">Reading</th>
+              <th style="white-space: nowrap; text-align: left;">Due Date</th>
+              <th style="white-space: nowrap; text-align: right;">Consumption</th>
+              <th style="white-space: nowrap; text-align: left;">Status</th>
+              <th style="white-space: nowrap; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+
+          <tbody>
+        """
+
+        for trans in visible_data:
+            try:
+                status = str(trans[8]).strip().upper()
+                con = float(trans[5])
+                amt = float(trans[6])
+                if status == "PAID":
+                    paid_con += con
+                    paid_amt += amt
+                elif status == "PENDING":
+                    pend_con += con
+                    pend_amt += amt
+            except:
+                continue
+
+            html += f"""
+            <tr>
+              <td>{trans[0]}</td>
+              <td>{trans[1]}</td>
+              <td>{trans[2]}</td>
+              <td>{trans[3]}</td>
+              <td>{trans[4]}</td>
+              <td>{trans[7]}</td>
+              <td align="right">{con:,.2f}</td>
+              <td>{status.title()}</td>
+              <td align="right" style="white-space: nowrap;">₱{amt:,.2f}</td>
+            </tr>
+            """
+
+        if self.filter_combo.currentText() != "Status: Voided":
+            total_con = paid_con + pend_con
+            total_amt = paid_amt + pend_amt
+
+            html += f"""
+            <tr style="font-size: 8pt;">
+              <td colspan="4" style="border:none;"></td>
+              <td colspan="2" align="left"><b>Total Paid Consumption:</b></td>
+              <td align="right"><b>{paid_con:,.2f}</b></td>
+              <td><b>Total Paid Amount:</b></td>
+              <td align="right"><b>₱{paid_amt:,.2f}</b></td>
+            </tr>
+            <tr style="font-size: 8pt;">
+              <td colspan="4" style="border:none;"></td>
+              <td colspan="2" align="left"><b>Total Pending Consumption:</b></td>
+              <td align="right"><b>{pend_con:,.2f}</b></td>
+              <td><b>Total Pending Amount:</b></td>
+              <td align="right"><b>₱{pend_amt:,.2f}</b></td>
+            </tr>
+            <tr style="font-size: 8pt;">
+              <td colspan="4" style="border:none; border-top:2px solid black;"></td>
+              <td colspan="2" align="left"><b style="color: teal;">Grand Total Consumption:</b></td>
+              <td align="right" style="border-top:2px solid black;"><b style="color: teal;">{total_con:,.2f}</b></td>
+              <td><b style="color: teal;">Grand Total Amount:</b></td>
+              <td align="right" style="border-top:2px solid black;"><b style="color: teal;">₱{total_amt:,.2f}</b></td>
+            </tr>
+            """
+
+        html += "</tbody></table>"
+
+        doc = QTextDocument()
+        doc.setHtml(html)
+
+        printer = QPrinter(QPrinter.HighResolution)
+        preview = QPrintPreviewDialog(printer, self)
+        preview.setWindowTitle("Print Preview - Transactions")
+        preview.paintRequested.connect(doc.print_)
+        preview.exec_()
 
     def update_pagination(self):
         # Calculate total pages based on filtered data
@@ -255,9 +475,29 @@ class TransactionsPage(QtWidgets.QWidget):
         self.populate_table(self.all_transactions_data)
 
     def is_row_filtered(self, row_index):
-        if row_index >= len(self.all_transactions_data):
+        filter_by = self.filter_combo.currentText()
+        search_text = self.search_input.text().lower()
+        transaction = self.all_transactions_data[row_index]
+
+
+        # Force-hide voided unless explicitly selected
+        if filter_by != "Status: Voided" and str(transaction[8]).strip().lower() == "voided":
             return True
-            
+
+        if filter_by == "Transaction Number":
+            return search_text not in str(transaction[0]).lower()
+        elif filter_by == "Client Name":
+            return search_text not in str(transaction[3]).lower()
+        elif filter_by == "Employee":
+            return search_text not in str(transaction[4]).lower()
+        elif filter_by == "Date":
+            return search_text not in str(transaction[1]).lower()
+        elif filter_by.startswith("Status:"):
+            status_target = filter_by.split(":")[1].strip().lower()
+            transaction_status = str(transaction[8]).strip().lower()
+            return transaction_status != status_target
+        return False
+
         # Get transaction data for the row
         transaction = self.all_transactions_data[row_index]
         
@@ -268,11 +508,24 @@ class TransactionsPage(QtWidgets.QWidget):
             search_text = self.search_input_date.date().toString("yyyy-MM-dd").lower()
         else:
             search_text = self.search_input.text().lower()
-        
-        if not search_text:
-            # Only apply transaction type filter if no search text
+
+        filter_by = self.filter_combo.currentText()
+        search_text = ""
+
+        if filter_by.startswith("Status:"):
+            status_target = filter_by.split(":")[1].strip().lower()
+            transaction_status = str(transaction[8]).strip().lower()
+            if transaction_status != status_target:
+                return True
+            # still apply transaction type filter
             return self.is_transaction_type_filtered(transaction)
-        
+
+        # existing logic for other filters:
+        if filter_by == "Date":
+            search_text = self.search_input_date.date().toString("yyyy-MM-dd").lower()
+        else:
+            search_text = self.search_input.text().lower()
+
         # Check if the row matches the filter
         # Getting appropriate field index for the search criteria
         field_mapping = {
@@ -287,7 +540,7 @@ class TransactionsPage(QtWidgets.QWidget):
             field_value = str(transaction[field_index]).lower()
             if search_text not in field_value:
                 return True  # Filter out this row
-        
+
         # Apply transaction type filter
         return self.is_transaction_type_filtered(transaction)
 
@@ -337,75 +590,109 @@ class TransactionsPage(QtWidgets.QWidget):
         self.update_pagination()
 
     def populate_table(self, data):
-        self.transaction_table.setRowCount(0)  # Clear previous rows
-        
-        # Apply pagination and filtering
+        from backend.adminBack import adminPageBack
+        IadminPageBack = adminPageBack()
+
+        self.transaction_table.setRowCount(0)
         visible_row_counter = 0
         rows_to_show = []
-        
-        # First pass: determine which rows are visible based on filters
+
         for row_index, transaction in enumerate(data):
             if not self.is_row_filtered(row_index):
                 visible_row_counter += 1
-                
-                # Check if this row should be on the current page
                 start_index = (self.current_page - 1) * self.records_per_page + 1
                 end_index = self.current_page * self.records_per_page
-                
                 if start_index <= visible_row_counter <= end_index:
                     rows_to_show.append(transaction)
-        
-        # Set row count for visible rows on current page
-        self.transaction_table.setRowCount(len(rows_to_show))
-        
-        # Populate only the rows that should be visible on this page   
+
+        self.transaction_table.setRowCount(len(rows_to_show) + 1)
+
         for table_row, transaction in enumerate(rows_to_show):
-            trans_code, trans_payment_date, client_number, client_name, user_name, billing_consumption, billing_total, billing_due, trans_status = transaction
-            
-            # For each cell that might have long text, create a custom widget with scrollable text
+            trans_code = transaction[0]
+            trans_payment_date = transaction[1]
+            client_number = transaction[2]
+            client_name = transaction[3]
+            reading_id = transaction[4]  # Use reading_id instead of user_name
+            billing_consumption = transaction[5]
+            billing_total = transaction[6]
+            billing_due = transaction[7]
+            trans_status = transaction[8]
+            reading_date = transaction[9] if len(transaction) > 9 else "N/A"
+
+            # Retrieve reading info
+            try:
+                reading = IadminPageBack.get_reading_by_id(reading_id)
+                reading_text = f"Previous: {reading[0]:,.2f}\nCurrent: {reading[1]:,.2f}" if reading else "N/A"
+            except Exception as e:
+                reading_text = "Error"
+
             self.create_scrollable_cell(table_row, 0, str(trans_code))
-            self.create_scrollable_cell(table_row, 1, str(trans_payment_date))
+            self.create_scrollable_cell(table_row, 1,
+                                        str(trans_payment_date if trans_status == 'PAID' else reading_date))
             self.create_scrollable_cell(table_row, 2, str(client_number))
             self.create_scrollable_cell(table_row, 3, str(client_name))
-            self.create_scrollable_cell(table_row, 4, str(user_name))
-            self.create_scrollable_cell(table_row, 5, str(billing_consumption))
-            self.create_scrollable_cell(table_row, 6, str(billing_total))
-            self.create_scrollable_cell(table_row, 7, str(billing_due))
+            self.create_scrollable_cell(table_row, 4, reading_text)
+            self.create_scrollable_cell(table_row, 5, str(billing_due))
+            self.create_scrollable_cell(table_row, 6, f"{billing_consumption:,.2f}")
 
-            # Create status layout with label + toggle button
-            status_layout = QtWidgets.QHBoxLayout()
-            status_layout.setContentsMargins(5, 0, 5, 0)
-
-            # Status label
             status_label = QtWidgets.QLabel(trans_status)
-            status_label.setStyleSheet(f"color: {'#4CAF50' if trans_status == 'PAID' else '#E57373'}; font-weight: bold;")
-            
-            # Toggle button
-            toggle_button = QtWidgets.QPushButton()
-            toggle_button.setCheckable(True)
-            toggle_button.setChecked(trans_status == "PAID")
-            toggle_button.setFixedSize(40, 20)
-            toggle_button.setStyleSheet("""
-                QPushButton {
-                    background-color: red;
-                    border: 1px solid #aaa;
-                    border-radius: 10px;
-                }
-                QPushButton:checked {
-                    background-color: green;
-                }
-            """)
-            toggle_button.clicked.connect(lambda checked, r=table_row, lbl=status_label: self.toggle_status(r, lbl))
+            status_label.setStyleSheet(
+                f"color: {'#4CAF50' if trans_status == 'PAID' else '#E57373'}; font-weight: bold;")
+            self.transaction_table.setCellWidget(table_row, 7, status_label)
 
-            # Add label and button to layout
-            status_layout.addWidget(status_label)
-            status_layout.addStretch()
-            status_layout.addWidget(toggle_button)
+            self.create_scrollable_cell(table_row, 8, f"₱{billing_total:,.2f}")
 
-            # Set the layout into a QWidget
-            status_container = QtWidgets.QWidget()
-            status_container.setLayout(status_layout)
-            self.transaction_table.setCellWidget(table_row, 8, status_container)
+        # Summary section
+        paid_con = pend_con = paid_amt = pend_amt = 0
+        for trans in rows_to_show:
+            try:
+                status = str(trans[8]).strip().upper()
+                con = float(trans[5])
+                amt = float(trans[6])
+                if status == "PAID":
+                    paid_con += con
+                    paid_amt += amt
+                elif status == "PENDING":
+                    pend_con += con
+                    pend_amt += amt
+            except:
+                continue
+
+        summary_start_row = len(rows_to_show)
+        current_filter = self.filter_combo.currentText()
+        if current_filter == "Status: Voided":
+            return
+
+        def add_summary_row(row, label1, value1, label2, value2):
+            self.transaction_table.setItem(row, 5, QtWidgets.QTableWidgetItem(label1))
+            self.transaction_table.setItem(row, 6, QtWidgets.QTableWidgetItem(f"{value1:,.2f}"))
+            self.transaction_table.setItem(row, 7, QtWidgets.QTableWidgetItem(label2))
+            self.transaction_table.setItem(row, 8, QtWidgets.QTableWidgetItem(f"₱{value2:,.2f}"))
+
+        if current_filter == "Status: Paid":
+            self.transaction_table.setRowCount(summary_start_row + 1)
+            add_summary_row(summary_start_row, "Total Paid Consumption", paid_con, "Total Paid Amount", paid_amt)
+        elif current_filter == "Status: Pending":
+            self.transaction_table.setRowCount(summary_start_row + 1)
+            add_summary_row(summary_start_row, "Total Pending Consumption", pend_con, "Total Pending Amount", pend_amt)
+        else:
+            total_con = paid_con + pend_con
+            total_amt = paid_amt + pend_amt
+            self.transaction_table.setRowCount(summary_start_row + 3)
+            add_summary_row(summary_start_row, "Total Paid Consumption", paid_con, "Total Paid Amount", paid_amt)
+            add_summary_row(summary_start_row + 1, "Total Pending Consumption", pend_con, "Total Pending Amount",
+                            pend_amt)
+            add_summary_row(summary_start_row + 2, "Grand Total Consumption", total_con, "Grand Total Amount",
+                            total_amt)
+
+        for row in range(summary_start_row, self.transaction_table.rowCount()):
+            for col in range(5, 9):
+                item = self.transaction_table.item(row, col)
+                if item:
+                    font = self.transaction_table.font()
+                    font.setPointSize(font.pointSize() - 1)
+                    font.setBold(True)
+                    item.setFont(font)
 
     def toggle_search_input(self, text):
         if text == "Date":
@@ -423,22 +710,12 @@ class TransactionsPage(QtWidgets.QWidget):
         self.current_page = 1  # Reset to first page when filtering
         self.update_pagination()
 
-    def toggle_status(self, row, label):
-        table = self.transaction_table
-        container = table.cellWidget(row, 8)
-        if container:
-            toggle_button = container.findChild(QtWidgets.QPushButton)
-            if toggle_button:
-                if toggle_button.isChecked():
-                    label.setText("PAID")
-                    label.setStyleSheet("color: #4CAF50; font-weight: bold;")
-                else:
-                    label.setText("PENDING")
-                    label.setStyleSheet("color: #E57373; font-weight: bold;")
-                
-                # Here you would add code to update the transaction status in the database
-                # Example: self.update_transaction_status_in_db(transaction_id, new_status)
-
+        # Dynamically change header label
+        current_filter = self.filter_combo.currentText()
+        if current_filter == "Status: Pending":
+            self.transaction_table.setHorizontalHeaderItem(1, QtWidgets.QTableWidgetItem("READING DATE"))
+        else:
+            self.transaction_table.setHorizontalHeaderItem(1, QtWidgets.QTableWidgetItem("PAYMENT DATE"))
 
 class ScrollableTextWidget(QtWidgets.QWidget):
     
