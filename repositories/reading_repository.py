@@ -16,19 +16,18 @@ class ReadingRepository:
         cursor.close()
         conn.close()
         return readings
-    
+
     def get_reading_by_id(self, reading_id):
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT * FROM METER WHERE READING_ID = %s;",
+            "SELECT reading_prev, reading_current FROM reading WHERE reading_id = %s;",
             (reading_id,)
         )
-        reading = cursor.fetchall()
+        reading = cursor.fetchone()
         cursor.close()
         conn.close()
-        return reading
-    
+        return reading if reading else None
 
     def create_reading(self, read_date, prev_read, pres_read, meter_id):
         conn = self.get_connection()

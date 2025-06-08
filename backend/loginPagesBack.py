@@ -7,7 +7,7 @@ class LoginPagesBack:
         self.conn = psycopg2.connect(
             dbname="system",
             user="postgres",
-            password="123456",
+            password="123",
             host="localhost",
             port="5432"
         )

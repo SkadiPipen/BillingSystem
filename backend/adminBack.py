@@ -64,6 +64,10 @@ class adminPageBack:
     def update_billing_status(self, billing_id, new_status):
         billing_repo = BillingRepository()
         return billing_repo.update_status(billing_id, new_status)
+    
+    def add_transaction(self, billing_id, trans_status, trans_payment_date, trans_total_amount, client_id, reading_id):
+        transaction_repo = TransactionRepository()
+        return transaction_repo.create_transaction(billing_id, trans_status, trans_payment_date, trans_total_amount, client_id, reading_id)
 
 
     def fetch_client_by_id(self, client_id):
@@ -117,6 +121,14 @@ class adminPageBack:
         result = reading_repository.create_reading(read_date, prev_read, pres_read, meter_id)
         self.log_action(f"Added new reading for meter ID: {meter_id}")
         return result
+    
+    def get_transaction_id_by_billing_id(self, billing_id):
+        transaction_repo = TransactionRepository()
+        return transaction_repo.get_transaction_id_by_billing_id(billing_id)
+    
+    def update_transaction_status(self, transaction_id, new_status):
+        transaction_repo = TransactionRepository()
+        return transaction_repo.update_transaction_status(transaction_id, new_status)
 
     def add_meter(self, meter_last_reading, serial_number):
         meter_repository = MeterRepository()
@@ -177,9 +189,18 @@ class adminPageBack:
         meter_repository = MeterRepository()
         return meter_repository.get_meter_previous_reading(meter_id)
 
+    def get_reading_by_id(self, reading_id):
+        reading_repository = ReadingRepository()
+        result = reading_repository.get_reading_by_id(reading_id)
+        return result[0] if result else None  # return (reading_prev, reading_current)
+
     def get_billing_id(self, billing_code):
         billing_repository = BillingRepository()
         return billing_repository.get_billing_id(billing_code)
+    
+    def get_billing_by_id(self, billing_id):
+        billing_repository = BillingRepository()
+        return billing_repository.get_billing_by_id(billing_id)
 
     def fetch_readings_by_meter_id(self, meter_id):
         reading_repository = MeterRepository()
@@ -192,6 +213,11 @@ class adminPageBack:
     def fetch_system_logs(self):
         transaction_repo = TransactionRepository()
         return transaction_repo.get_all_system_logs() 
+    
+    def update_billing_issued_date(self, billing_id, issued_date):
+        billing_repo = BillingRepository()
+        return billing_repo.update_billing_issued_date(billing_id, issued_date)
+
 
     def insert_rate_block(self, is_minimum, min_con, max_con, rate, categ_id):
         rateblock_repo = RateBlockRepository()
@@ -225,3 +251,49 @@ class adminPageBack:
 
 
 
+
+
+    def mark_bill_paid(self, billing_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE billing SET billing_status='PAID' WHERE billing_id=%s", (billing_id,))
+        cursor.execute("UPDATE transactions SET trans_status='PAID', trans_payment_date=NOW() WHERE billing_id=%s", (billing_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    def void_billing(self, billing_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE billing SET billing_status='VOID' WHERE billing_id=%s", (billing_id,))
+        cursor.execute("UPDATE transactions SET trans_status='VOID' WHERE billing_id=%s", (billing_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    def reissue_billing(self, original_billing_id, updated_data):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE billing SET billing_status='VOID' WHERE billing_id=%s", (original_billing_id,))
+        cursor.execute("UPDATE transactions SET trans_status='VOID' WHERE billing_id=%s", (original_billing_id,))
+
+        cursor.execute("""
+            INSERT INTO billing (billing_due, billing_total, billing_status)
+            VALUES (%s, %s, 'ISSUED')
+            RETURNING billing_id
+        """, (updated_data["billing_due"], updated_data["billing_total"]))
+        new_billing_id = cursor.fetchone()[0]
+
+        cursor.execute("""
+            INSERT INTO transactions (billing_id, trans_status, trans_total_amount)
+            VALUES (%s, 'PENDING', %s)
+        """, (new_billing_id, updated_data["billing_total"]))
+
+        cursor.execute("""
+            INSERT INTO billing_history (original_billing_id, new_billing_id)
+            VALUES (%s, %s)
+        """, (original_billing_id, new_billing_id))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
