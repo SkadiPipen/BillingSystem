@@ -26,20 +26,19 @@ class TransactionRepository:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT 
-                    t.TRANS_CODE, 
-                    t.TRANS_PAYMENT_DATE, 
-                    c.CLIENT_NUMBER, 
-                    c.CLIENT_NAME, 
-                    u.USER_NAME,
-                    b.BILLING_CONSUMPTION, 
-                    b.BILLING_TOTAL, 
-                    b.BILLING_DUE, 
-                    t.TRANS_STATUS,
-                    r.READING_DATE
+                    t.TRANS_CODE,            
+                    t.TRANS_PAYMENT_DATE,    
+                    c.CLIENT_NUMBER,         
+                    c.CLIENT_NAME,           
+                    t.READING_ID,            
+                    b.BILLING_CONSUMPTION,   
+                    b.BILLING_TOTAL,         
+                    b.BILLING_DUE,           
+                    t.TRANS_STATUS,          
+                    r.READING_DATE           
                 FROM TRANSACTIONS AS t
                 JOIN CLIENT AS c ON t.CLIENT_ID = c.CLIENT_ID
                 JOIN BILLING AS b ON t.BILLING_ID = b.BILLING_ID
-                JOIN USERS AS u ON t.USER_ID = u.USER_ID
                 LEFT JOIN READING AS r ON t.READING_ID = r.READING_ID
                 ORDER BY t.TRANS_ID ASC
             """)

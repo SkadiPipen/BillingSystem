@@ -396,13 +396,26 @@ class TransactionsPage(QtWidgets.QWidget):
             except:
                 continue
 
+            # Get reading display text (like in populate_table)
+            try:
+                reading_text = "N/A"
+                reading_id = trans[4]
+                if reading_id:
+                    reading = IadminPageBack.get_reading_by_id(reading_id)
+                    if reading and isinstance(reading, (list, tuple)) and len(reading) == 2:
+                        prev, curr = reading
+                        if prev is not None and curr is not None:
+                            reading_text = f"Prev: {float(prev):,.2f}<br>Current: {float(curr):,.2f}"
+            except Exception as e:
+                reading_text = "Error"
+
             html += f"""
             <tr>
               <td>{trans[0]}</td>
               <td>{trans[1]}</td>
               <td>{trans[2]}</td>
               <td>{trans[3]}</td>
-              <td>{trans[4]}</td>
+              <td>{reading_text}</td>
               <td>{trans[7]}</td>
               <td align="right">{con:,.2f}</td>
               <td>{status.title()}</td>
@@ -612,43 +625,70 @@ class TransactionsPage(QtWidgets.QWidget):
             trans_payment_date = transaction[1]
             client_number = transaction[2]
             client_name = transaction[3]
-            reading_id = transaction[4]  # Use reading_id instead of user_name
+            reading_id = transaction[4]
             billing_consumption = transaction[5]
             billing_total = transaction[6]
             billing_due = transaction[7]
             trans_status = transaction[8]
             reading_date = transaction[9] if len(transaction) > 9 else "N/A"
 
-            # Retrieve reading info
+            # Get reading text
+            # Get reading text
+            # Robust reading display
             try:
-                reading = IadminPageBack.get_reading_by_id(reading_id)
-                reading_text = f"Previous: {reading[0]:,.2f}\nCurrent: {reading[1]:,.2f}" if reading else "N/A"
+                reading_text = "N/A"
+                if reading_id:
+                    print(f"Getting reading for ID: {reading_id}")
+                    reading = IadminPageBack.get_reading_by_id(reading_id)
+                    print(f"Result from get_reading_by_id({reading_id}): {reading}")
+
+                    if reading and isinstance(reading, (list, tuple)) and len(reading) == 2:
+                        prev, curr = reading
+                        if prev is not None and curr is not None:
+                            reading_text = f"Previous: {float(prev):,.2f}\nCurrent: {float(curr):,.2f}"
+                        else:
+                            reading_text = "N/A"
+                    else:
+                        reading_text = "N/A"
             except Exception as e:
+                print(f"Reading fetch error for ID {reading_id}: {e}")
                 reading_text = "Error"
 
+            self.create_scrollable_cell(table_row, 4, reading_text)
+
+            # Display date logic
+            status_str = str(trans_status).strip().upper() if trans_status else ""
+            payment_display = trans_payment_date if status_str == "PAID" else reading_date
+
+            # Display table cells
             self.create_scrollable_cell(table_row, 0, str(trans_code))
-            self.create_scrollable_cell(table_row, 1,
-                                        str(trans_payment_date if trans_status == 'PAID' else reading_date))
+            self.create_scrollable_cell(table_row, 1, str(payment_display))
             self.create_scrollable_cell(table_row, 2, str(client_number))
             self.create_scrollable_cell(table_row, 3, str(client_name))
-            self.create_scrollable_cell(table_row, 4, reading_text)
-            self.create_scrollable_cell(table_row, 5, str(billing_due))
-            self.create_scrollable_cell(table_row, 6, f"{billing_consumption:,.2f}")
+            self.create_scrollable_cell(table_row, 5, str(billing_due))  # DUE DATE here
+            self.create_scrollable_cell(table_row, 6,
+                                        f"{float(billing_consumption):,.2f}" if billing_consumption else "0.00")  # CONSUMPTION
 
-            status_label = QtWidgets.QLabel(trans_status)
+            # Correct STATUS in Column 7
+            status_label = QtWidgets.QLabel(str(trans_status))
             status_label.setStyleSheet(
-                f"color: {'#4CAF50' if trans_status == 'PAID' else '#E57373'}; font-weight: bold;")
+                f"color: {'#4CAF50' if str(trans_status).upper() == 'PAID' else '#E57373'}; font-weight: bold;")
             self.transaction_table.setCellWidget(table_row, 7, status_label)
 
-            self.create_scrollable_cell(table_row, 8, f"₱{billing_total:,.2f}")
+            # Correct AMOUNT in Column 8
+            try:
+                amount = f"₱{float(billing_total):,.2f}" if billing_total else "₱0.00"
+            except:
+                amount = "₱0.00"
+            self.create_scrollable_cell(table_row, 8, amount)
 
-        # Summary section
-        paid_con = pend_con = paid_amt = pend_amt = 0
+        # Summary Calculations
+        paid_con = pend_con = paid_amt = pend_amt = 0.0
         for trans in rows_to_show:
             try:
                 status = str(trans[8]).strip().upper()
-                con = float(trans[5])
-                amt = float(trans[6])
+                con = float(trans[5]) if trans[5] else 0.0
+                amt = float(trans[6]) if trans[6] else 0.0
                 if status == "PAID":
                     paid_con += con
                     paid_amt += amt
@@ -685,6 +725,7 @@ class TransactionsPage(QtWidgets.QWidget):
             add_summary_row(summary_start_row + 2, "Grand Total Consumption", total_con, "Grand Total Amount",
                             total_amt)
 
+        # Style the summary rows
         for row in range(summary_start_row, self.transaction_table.rowCount()):
             for col in range(5, 9):
                 item = self.transaction_table.item(row, col)
