@@ -64,6 +64,10 @@ class adminPageBack:
     def update_billing_status(self, billing_id, new_status):
         billing_repo = BillingRepository()
         return billing_repo.update_status(billing_id, new_status)
+    
+    def add_transaction(self, billing_id, trans_status, trans_payment_date, trans_total_amount, client_id, reading_id):
+        transaction_repo = TransactionRepository()
+        return transaction_repo.create_transaction(billing_id, trans_status, trans_payment_date, trans_total_amount, client_id, reading_id)
 
 
     def fetch_client_by_id(self, client_id):
@@ -71,6 +75,14 @@ class adminPageBack:
         client = client_repository.get_client_by_id(client_id)
         self.log_action(f"Fetched client by ID: {client_id}")
         return client
+    
+    def update_reading(self, reading_id, reading_date, reading_current):
+        reading_repo = ReadingRepository()
+        return reading_repo.update_reading(reading_id, reading_date, reading_current)
+
+    def get_meter_id_by_reading_id(self, reading_id):
+        meter_repo = MeterRepository()
+        return meter_repo.get_meter_id_by_reading_id(reading_id)
 
     def add_client(self, client_name, client_lname, client_contact_num, client_location, meter_id,
                    address_id, categ_id, client_mname, status):
@@ -117,6 +129,14 @@ class adminPageBack:
         result = reading_repository.create_reading(read_date, prev_read, pres_read, meter_id)
         self.log_action(f"Added new reading for meter ID: {meter_id}")
         return result
+    
+    def get_transaction_id_by_billing_id(self, billing_id):
+        transaction_repo = TransactionRepository()
+        return transaction_repo.get_transaction_id_by_billing_id(billing_id)
+    
+    def update_transaction_status(self, transaction_id, new_status):
+        transaction_repo = TransactionRepository()
+        return transaction_repo.update_transaction_status(transaction_id, new_status)
 
     def add_meter(self, meter_last_reading, serial_number):
         meter_repository = MeterRepository()
@@ -179,17 +199,24 @@ class adminPageBack:
 
     def get_reading_by_id(self, reading_id):
         reading_repository = ReadingRepository()
-        return reading_repository.get_reading_by_id(reading_id)  # DO NOT do result[0]
+        result = reading_repository.get_reading_by_id(reading_id)
+        return result[0] if result else None  # return (reading_prev, reading_current)
 
     def get_prev_current_by_id(self, reading_id):
         reading_repository = ReadingRepository()
         return reading_repository.get_reading_by_id(reading_id)  # DO NOT do result[0]
-
-    # return (reading_prev, reading_current)
+    
+    def get_reading_info_by_id(self, reading_id):
+        reading_repo = ReadingRepository()
+        return reading_repo.get_reading_info_by_id(reading_id)
 
     def get_billing_id(self, billing_code):
         billing_repository = BillingRepository()
         return billing_repository.get_billing_id(billing_code)
+    
+    def get_billing_by_id(self, billing_id):
+        billing_repository = BillingRepository()
+        return billing_repository.get_billing_by_id(billing_id)
 
     def fetch_readings_by_meter_id(self, meter_id):
         reading_repository = MeterRepository()
@@ -202,6 +229,15 @@ class adminPageBack:
     def fetch_system_logs(self):
         transaction_repo = TransactionRepository()
         return transaction_repo.get_all_system_logs() 
+    
+    def update_billing_issued_date(self, billing_id, issued_date):
+        billing_repo = BillingRepository()
+        return billing_repo.update_billing_issued_date(billing_id, issued_date)
+    
+    def edit_billing(self, billing_id, billing_total, billing_due, sub_capital, late_payment, penalty, total_charge, billing_amount, billing_consumption, billing_date):
+        billing_repo = BillingRepository()
+        return billing_repo.edit_billing(billing_id, billing_total, billing_due, sub_capital, late_payment, penalty, total_charge, billing_amount, billing_consumption, billing_date)
+
 
     def insert_rate_block(self, is_minimum, min_con, max_con, rate, categ_id):
         rateblock_repo = RateBlockRepository()
@@ -230,8 +266,226 @@ class adminPageBack:
     def serial_exists(self, serial_number):
         meter_repo = MeterRepository()
         return meter_repo.serial_exists(serial_number)
+    
+    def void_reading(self, reading_id):
+        reading_repo = ReadingRepository()
+        return reading_repo.void_reading(reading_id)
+
+    def get_reading_id_by_billing_id(self, billing_id):
+        reading_repo = ReadingRepository()
+        return reading_repo.get_reading_id_by_billing_id(billing_id)
 
 
+    def mark_transaction_paid(self, transaction_id, payment_date):
+        transaction_repo = TransactionRepository()
+        return transaction_repo.mark_transaction_paid(transaction_id, payment_date)
+    
+    def get_reading_by_current_and_meter(self, current_val, meter_id):
+        reading_repo = ReadingRepository()
+        return reading_repo.get_reading_by_current_and_meter(current_val, meter_id)
 
 
+    def mark_bill_paid(self, billing_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE billing SET billing_status='PAID' WHERE billing_id=%s", (billing_id,))
+        cursor.execute("UPDATE transactions SET trans_status='PAID', trans_payment_date=NOW() WHERE billing_id=%s", (billing_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
 
+    def void_billing(self, billing_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE billing SET billing_status='VOID' WHERE billing_id=%s", (billing_id,))
+        cursor.execute("UPDATE transactions SET trans_status='VOID' WHERE billing_id=%s", (billing_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    def reissue_billing(self, original_billing_id, updated_data):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE billing SET billing_status='VOID' WHERE billing_id=%s", (original_billing_id,))
+        cursor.execute("UPDATE transactions SET trans_status='VOID' WHERE billing_id=%s", (original_billing_id,))
+
+        cursor.execute("""
+            INSERT INTO billing (billing_due, billing_total, billing_status)
+            VALUES (%s, %s, 'ISSUED')
+            RETURNING billing_id
+        """, (updated_data["billing_due"], updated_data["billing_total"]))
+        new_billing_id = cursor.fetchone()[0]
+
+        cursor.execute("""
+            INSERT INTO transactions (billing_id, trans_status, trans_total_amount)
+            VALUES (%s, 'PENDING', %s)
+        """, (new_billing_id, updated_data["billing_total"]))
+
+        cursor.execute("""
+            INSERT INTO billing_history (original_billing_id, new_billing_id)
+            VALUES (%s, %s)
+        """, (original_billing_id, new_billing_id))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    def fetch_active_clients(self):
+        """
+        Fetches all active clients from the database.
+        Returns a list of tuples with selected fields.
+        """
+        try:
+            db = DBConnector()
+            conn = db.get_connection()
+            cursor = conn.cursor()
+
+            query = """
+                    SELECT c.CLIENT_ID, \
+                           c.CLIENT_NUMBER, \
+                           c.CLIENT_NAME, \
+                           c.CLIENT_MNAME, \
+                           c.CLIENT_LNAME, \
+                           c.CLIENT_STATUS, \
+                           m.METER_ID, \
+                           c.CATEG_ID
+                    FROM CLIENT c
+                             LEFT JOIN METER m ON c.METER_ID = m.METER_ID
+                    WHERE c.CLIENT_STATUS = 'Active'
+                    ORDER BY c.CLIENT_LNAME ASC, c.CLIENT_NAME ASC \
+                    """
+
+            cursor.execute(query)
+            result = cursor.fetchall()
+            return result
+
+        except Exception as e:
+            print("Error fetching active clients:", str(e))
+            return []
+
+        finally:
+            if conn:
+                cursor.close()
+                conn.close()    
+
+    def delete_billing(self, billing_code):
+        conn = None
+        try:
+            db = DBConnector()
+            conn = db.get_connection()
+            cursor = conn.cursor()
+
+            # Get billing ID from code
+            cursor.execute("SELECT billing_id FROM billing WHERE billing_code = %s", (billing_code,))
+            result = cursor.fetchone()
+            if not result:
+                raise Exception(f"No billing found with code {billing_code}")
+            billing_id = result[0]
+
+            # Get associated reading_id
+            cursor.execute("SELECT reading_id FROM billing WHERE billing_id = %s", (billing_id,))
+            reading_result = cursor.fetchone()
+            if not reading_result:
+                raise Exception(f"No reading found linked to billing ID {billing_id}")
+            reading_id = reading_result[0]
+
+            # Get reading details before deletion
+            cursor.execute("""
+                           SELECT meter_id, reading_prev, reading_current, reading_date
+                           FROM reading
+                           WHERE reading_id = %s
+                           """, (reading_id,))
+            reading_info = cursor.fetchone()
+            if not reading_info:
+                raise Exception(f"Reading data missing for ID {reading_id}")
+            meter_id, prev_reading, current_reading, reading_date = reading_info
+
+            # Delete billing and reading records
+            cursor.execute("DELETE FROM billing WHERE billing_id = %s", (billing_id,))
+            cursor.execute("DELETE FROM reading WHERE reading_id = %s", (reading_id,))
+
+            # Find latest non-deleted reading
+            cursor.execute("""
+                           SELECT reading_current, reading_date
+                           FROM reading
+                           WHERE meter_id = %s
+                             AND reading_date < %s
+                           ORDER BY reading_date DESC LIMIT 1
+                           """, (meter_id, reading_date))
+            last_reading = cursor.fetchone()
+
+            # Determine fallback values
+            if last_reading:
+                last_value, last_date = last_reading
+            else:
+                last_value = prev_reading
+                last_date = reading_date
+
+            # Update meter with previous reading
+            cursor.execute("""
+                           UPDATE meter
+                           SET meter_last_reading      = %s,
+                               meter_last_reading_date = %s
+                           WHERE meter_id = %s
+                           """, (last_value, last_date, meter_id))
+
+            conn.commit()
+            print(f"[SUCCESS] Billing {billing_code} deleted successfully.")
+
+        except Exception as e:
+            conn.rollback()
+            print(f"[ERROR] Failed to delete billing: {str(e)}")
+            raise Exception(f"Failed to delete billing: {str(e)}")
+
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    def fetch_billing_to_issue(self):
+        try:
+            db = DBConnector()
+            conn = db.get_connection()
+            cursor = conn.cursor()
+
+            query = """
+                    SELECT b.billing_code, b.billing_due, c.client_name
+                    FROM billing b
+                             JOIN client c ON b.client_id = c.client_id
+                    WHERE b.billing_status = 'PRINTED' \
+                    """
+            cursor.execute(query)
+            result = cursor.fetchall()
+            return result
+        except Exception as e:
+            print("Error fetching billings for issuing:", str(e))
+            return []
+        finally:
+            if conn:
+                conn.close()
+
+    def fetch_billing_pending_payment(self):
+        try:
+            db = DBConnector()
+            conn = db.get_connection()
+            cursor = conn.cursor()
+
+            query = """
+                    SELECT b.billing_code, b.issued_date, c.client_name
+                    FROM billing b
+                             JOIN client c ON b.client_id = c.client_id
+                    WHERE b.billing_status = 'PENDING PAYMENT' \
+                    """
+            cursor.execute(query)
+            result = cursor.fetchall()
+            return result
+        except Exception as e:
+            print("Error fetching pending payments:", str(e))
+            return []
+        finally:
+            if conn:
+                conn.close()
+
+    
+    

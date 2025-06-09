@@ -103,7 +103,12 @@ class MeterRepository:
     def get_readings_by_meter_id(self, meter_id):
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM READING WHERE METER_ID = %s ORDER BY READING_DATE DESC", (meter_id,))
+        cursor.execute("""
+                       SELECT reading_date, reading_prev, reading_current, is_voided
+                       FROM READING
+                       WHERE METER_ID = %s
+                       ORDER BY READING_DATE DESC
+                       """, (meter_id,))
         readings = cursor.fetchall()
         cursor.close()
         conn.close()
@@ -189,6 +194,17 @@ class MeterRepository:
                 cursor.close()
             if conn:
                 conn.close()    
+
+
+    def get_meter_id_by_reading_id(self, reading_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT meter_id FROM reading WHERE reading_id = %s", (reading_id,))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result[0] if result else None
+
 
 
         

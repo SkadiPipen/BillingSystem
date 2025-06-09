@@ -11,7 +11,7 @@ class BillingRepository:
     def get_billing_by_id(self, billing_id):
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM BILLING WHERE ID = %s;", (billing_id,))
+        cursor.execute("SELECT * FROM BILLING WHERE BILLING_ID = %s;", (billing_id,))
         bill = cursor.fetchone()
         cursor.close()
         conn.close()
@@ -199,10 +199,61 @@ class BillingRepository:
             conn.close()
             return False
         
+    def edit_billing(self, billing_id, billing_total, billing_due, sub_capital, late_payment, penalty, total_charge, billing_amount, billing_consumption, billing_date):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                UPDATE billing
+                SET 
+                    billing_total = %s,
+                    billing_due = %s,
+                    billing_sub_capital = %s,
+                    billing_late_payment = %s,
+                    billing_penalty = %s,
+                    billing_total_charge = %s,
+                    billing_amount = %s,
+                    billing_consumption = %s,
+                    billing_date = %s
+                WHERE billing_id = %s
+            """, (
+                billing_total,
+                billing_due,
+                sub_capital,
+                late_payment,
+                penalty,
+                total_charge,
+                billing_amount,
+                billing_consumption,
+                billing_date,
+                billing_id
+            ))
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            cursor.close()
+            conn.close()
+
+
+        
     def update_status(self, billing_id, new_status):
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute("UPDATE billing SET billing_status = %s WHERE billing_id = %s", (new_status, billing_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    def update_billing_issued_date(self, billing_id, issued_date):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE BILLING 
+            SET ISSUED_DATE = %s 
+            WHERE BILLING_ID = %s;
+        """, (issued_date, billing_id))
         conn.commit()
         cursor.close()
         conn.close()

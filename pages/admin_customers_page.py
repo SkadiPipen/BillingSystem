@@ -63,7 +63,7 @@ class AdminCustomersPage(QtWidgets.QWidget):
 
         # Search criteria dropdown
         self.search_criteria = QtWidgets.QComboBox()
-        self.search_criteria.addItems(["First Name", "Last Name", "Location", "Category", "Active", "Inactive"])
+        self.search_criteria.addItems(["First Name", "Last Name", "Location", "Category"])
         self.search_criteria.setStyleSheet("""
             QComboBox {
                 padding: 8px;
@@ -83,6 +83,20 @@ class AdminCustomersPage(QtWidgets.QWidget):
             }
         """)
         search_container.addWidget(self.search_criteria)
+
+        # Add status filter dropdown
+        self.status_filter = QtWidgets.QComboBox()
+        self.status_filter.addItems(["All", "Active", "Inactive"])
+        self.status_filter.setStyleSheet(self.search_criteria.styleSheet())
+        self.status_filter.currentTextChanged.connect(self.filter_table)
+
+        # Status filter label
+        status_label = QtWidgets.QLabel("Status:")
+        status_label.setStyleSheet("font-family: 'Roboto', sans-serif; padding-left: 10px;")
+
+        # Add status filter to search container
+        search_container.addWidget(status_label)
+        search_container.addWidget(self.status_filter)
 
         # Search input
         self.search_input = QtWidgets.QLineEdit()
@@ -297,12 +311,15 @@ class AdminCustomersPage(QtWidgets.QWidget):
     def is_row_filtered(self, row_index):
         if row_index >= len(self.all_customers_data):
             return True
+
         customer = self.all_customers_data[row_index]
         search_by = self.search_criteria.currentText()
 
-        if search_by in ["Active", "Inactive"]:
-            search_text = search_by.lower()
-            return customer[9].lower() != search_text
+        # ✅ Correctly access status using index 10 (not 9)
+        status_filter = self.status_filter.currentText()
+        if status_filter != "All":
+            if customer[10].lower() != status_filter.lower():
+                return True
 
         if search_by == "Category":
             search_text = self.search_input_combo.currentText().lower()
@@ -462,7 +479,7 @@ class AdminCustomersPage(QtWidgets.QWidget):
             self.search_input.show()
             self.search_input_combo.hide()
 
-            # Update filtering when search type changes
+        # Update filtering when search type changes
         self.filter_table()
 
     def toggle_status(self, row, label):
@@ -579,9 +596,11 @@ class AdminCustomersPage(QtWidgets.QWidget):
 
         # Fetch backend data
         for category_id, category_name, category_status, category_date in self.IadminPageBack.fetch_categories():
-            fields["Category"].addItem(category_name, category_id)
+            if category_status == 'Active':
+                fields["Category"].addItem(category_name, category_id)
         for address_id, address_name, address_status, address_date in self.IadminPageBack.fetch_address():
-            fields["Address"].addItem(address_name, address_id)
+            if address_status == 'Active':
+                fields["Address"].addItem(address_name, address_id)
 
         # Layout inputs in 2 columns
         left_fields = ["First Name", "Middle Name", "Last Name", "Contact Number", "Category"]
@@ -619,7 +638,7 @@ class AdminCustomersPage(QtWidgets.QWidget):
         save_btn = QtWidgets.QPushButton("Save Customer")
         save_btn.setStyleSheet("""
             QPushButton {
-                background-color: white;
+                background-color: #81C784;
                 color: white;
                 padding: 8px 15px;
                 border-radius: 4px;
@@ -627,7 +646,7 @@ class AdminCustomersPage(QtWidgets.QWidget):
                 min-width: 100px;
             }
             QPushButton:hover {
-                background-color: #c0392b;
+                background-color: #66BB6A;
             }
         """)
 
@@ -945,6 +964,7 @@ class AdminCustomersPage(QtWidgets.QWidget):
         preview_dialog.paintRequested.connect(document.print_)
         preview_dialog.exec_()
         self.IadminPageBack.log_action("Printed customer list preview")
+
 
 
 class ScrollableTextWidget(QtWidgets.QWidget):

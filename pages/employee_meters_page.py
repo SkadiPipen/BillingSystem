@@ -16,7 +16,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 
 
-class MetersPage(QtWidgets.QWidget):
+class EmployeeMetersPage(QtWidgets.QWidget):
     def __init__(self, user_name, parent=None):
         super().__init__(parent)
         self.user_name = user_name
@@ -298,7 +298,7 @@ class MetersPage(QtWidgets.QWidget):
 
             btn_layout = QHBoxLayout()
             btn_widget = QWidget()
-            btn_layout.setContentsMargins(0, 0, 0, 0)
+            btn_layout.setContentsMargins(90, 0, 90, 0)
             btn_layout.addWidget(view_btn)
             btn_layout.addWidget(replace_btn)
             btn_widget.setLayout(btn_layout)
@@ -311,13 +311,12 @@ class MetersPage(QtWidgets.QWidget):
     def view_meter_details(self, meter_id):
         # Fetch detailed meter information
         meter_data = next((m for m in self.all_meters_data if m[4] == meter_id), None)
-
         if not meter_data:
             QtWidgets.QMessageBox.warning(self, "Error", "Meter data not found.")
             return
 
-        # Extract Meter Code from meter_data (index 0 is meter_code in formatted_meters)
-        meter_code = meter_data[0]  # ← Get Meter Code instead of Meter ID
+        # Extract Meter Code from meter_data
+        meter_code = meter_data[0]
 
         # Get readings for this meter only
         readings = self.IadminPageBack.fetch_readings_by_meter_id(meter_id)
@@ -326,13 +325,25 @@ class MetersPage(QtWidgets.QWidget):
         dialog = QDialog(self)
         dialog.setWindowTitle(f"Meter Readings - {meter_code}")
         dialog.resize(900, 600)  # Set initial dialog size
-
         layout = QVBoxLayout(dialog)
 
-        # Info Label - Display Meter Code instead of Meter ID
+        # Info Label - Display Meter Code
         info_label = QLabel(f"<b>Meter Code:</b> {meter_code}")
         info_label.setStyleSheet("font-size: 16px; padding-bottom: 10px;")
-        layout.addWidget(info_label)
+
+        # Status Filter Dropdown
+        status_filter = QComboBox()
+        status_filter.addItems(["All", "Active", "Voided"])
+        status_filter.setFixedWidth(120)  # Optional: control width
+        status_filter.currentIndexChanged.connect(lambda _: update_table())
+
+        # Horizontal layout to hold info label and dropdown
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(info_label)
+        header_layout.addWidget(status_filter, alignment=Qt.AlignRight)
+        header_layout.addStretch()  # Pushes everything to the left and aligns dropdown properly
+
+        layout.addLayout(header_layout)
 
         if not readings:
             # Show message if no readings
@@ -341,28 +352,57 @@ class MetersPage(QtWidgets.QWidget):
             no_data_label.setAlignment(Qt.AlignCenter)
             layout.addWidget(no_data_label)
         else:
-            # Table setup without Reading ID or Meter ID
+            # Table setup - Add an extra column for Status
             table = QTableWidget()
-            table.setColumnCount(3)  # Date, Previous Reading, Current Reading
-            table.setHorizontalHeaderLabels(["Date", "Previous Reading", "Current Reading"])
+            table.setColumnCount(4)  # Date, Previous Reading, Current Reading, Status
+            table.setHorizontalHeaderLabels(["Date", "Previous Reading", "Current Reading", "Status"])
             table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
             table.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
             table.setSelectionBehavior(QtWidgets.QTableWidget.SelectRows)
             table.verticalHeader().setVisible(False)
-
-            # Populate table
-            table.setRowCount(len(readings))
-            for row, reading in enumerate(readings):
-                try:
-                    reading_id, reading_date, prev_reading, current_reading, _ = reading
-                    table.setItem(row, 0, QTableWidgetItem(str(reading_date)))
-                    table.setItem(row, 1, QTableWidgetItem(str(prev_reading)))
-                    table.setItem(row, 2, QTableWidgetItem(str(current_reading)))
-                except Exception as e:
-                    print("Error unpacking reading:", reading, e)
-                    continue
-
             layout.addWidget(table)
+
+            def update_table():
+                """Updates the table based on selected status filter."""
+                selected_status = status_filter.currentText()
+
+                # Filter readings based on status
+                filtered = []
+                for reading in readings:
+                    try:
+                        reading_date, prev_reading, current_reading, is_voided = reading
+                        status = "Voided" if is_voided else "Active"
+                        if selected_status == "All" or status == selected_status:
+                            filtered.append(reading)
+                    except Exception as e:
+                        print("Error unpacking reading:", reading, e)
+                        continue
+
+                # Update table row count
+                table.setRowCount(len(filtered))
+
+                # Populate filtered rows
+                for row, reading in enumerate(filtered):
+                    try:
+                        reading_date, prev_reading, current_reading, is_voided = reading
+                        table.setItem(row, 0, QTableWidgetItem(str(reading_date)))
+                        table.setItem(row, 1, QTableWidgetItem(str(prev_reading)))
+                        table.setItem(row, 2, QTableWidgetItem(str(current_reading)))
+
+                        # Set status text and color based on is_voided
+                        status_item = QTableWidgetItem("Voided" if is_voided else "Active")
+                        if is_voided:
+                            status_item.setForeground(QtGui.QColor("red"))  # Red text for voided
+                        else:
+                            status_item.setForeground(QtGui.QColor("green"))  # Green text for active
+                        table.setItem(row, 3, status_item)
+
+                    except Exception as e:
+                        print("Error displaying reading:", reading, e)
+                        continue
+
+            # Initial population of the table
+            update_table()
 
         # Close button
         close_btn = QPushButton("Close")
@@ -441,6 +481,6 @@ class MetersPage(QtWidgets.QWidget):
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
-    window = MetersPage()
+    window = EmployeeMetersPage()
     window.show()
     sys.exit(app.exec_())

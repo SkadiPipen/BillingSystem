@@ -17,11 +17,12 @@ def image_to_base64(path):
         return f"data:image/png;base64,{encoded}"
 
 class TransactionsPage(QtWidgets.QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, username=None, parent=None):
         super().__init__(parent)
-        self.all_transactions_data = []  # Store all transaction data
+        self.username = username
+        self.all_transactions_data = []
         self.current_page = 1
-        self.records_per_page = 10  # Number of records per page
+        self.records_per_page = 10
         self.total_pages = 1
         self.setup_ui()
         self.showMaximized()
@@ -371,7 +372,7 @@ class TransactionsPage(QtWidgets.QWidget):
               <th style="white-space: nowrap; text-align: left;">Payment Date</th>
               <th style="white-space: nowrap; text-align: left;">Client No.</th>
               <th style="white-space: nowrap; text-align: left;">Client Name</th>
-              <th style="white-space: nowrap; text-align: left;">Reading</th>
+              <th style="white-space: nowrap; text-align: left;">Employee</th>
               <th style="white-space: nowrap; text-align: left;">Due Date</th>
               <th style="white-space: nowrap; text-align: right;">Consumption</th>
               <th style="white-space: nowrap; text-align: left;">Status</th>
@@ -633,8 +634,6 @@ class TransactionsPage(QtWidgets.QWidget):
             reading_date = transaction[9] if len(transaction) > 9 else "N/A"
 
             # Get reading text
-            # Get reading text
-            # Robust reading display
             try:
                 reading_text = "N/A"
                 if reading_id:
@@ -663,6 +662,7 @@ class TransactionsPage(QtWidgets.QWidget):
             self.create_scrollable_cell(table_row, 1, str(payment_display))
             self.create_scrollable_cell(table_row, 2, str(client_number))
             self.create_scrollable_cell(table_row, 3, str(client_name))
+
             self.create_scrollable_cell(table_row, 5, str(billing_due))  # DUE DATE here
             self.create_scrollable_cell(table_row, 6,
                                         f"{float(billing_consumption):,.2f}" if billing_consumption else "0.00")  # CONSUMPTION

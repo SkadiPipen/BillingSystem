@@ -17,7 +17,7 @@ class ReadingRepository:
         conn.close()
         return readings
 
-    def get_prev_current__by_id(self, reading_id):
+    def get_prev_current_by_id(self, reading_id):
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
@@ -27,7 +27,7 @@ class ReadingRepository:
                 WHERE reading_id = %s;
             """, (reading_id,))
             result = cursor.fetchone()
-            return result  # Tuple like (123, 234)
+            return result  
         except Exception as e:
             print(f"[DB ERROR] Failed to get reading: {e}")
             return None
@@ -38,24 +38,25 @@ class ReadingRepository:
                 conn.close()
 
     def get_reading_by_id(self, reading_id):
-        try:
-            conn = self.get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT reading_prev, reading_current
-                FROM READING
-                WHERE reading_id = %s;
-            """, (reading_id,))
-            result = cursor.fetchone()
-            return result  # Tuple like (123, 234)
-        except Exception as e:
-            print(f"[DB ERROR] Failed to get reading: {e}")
-            return None
-        finally:
-            if 'cursor' in locals():
-                cursor.close()
-            if 'conn' in locals():
-                conn.close()
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT reading_prev, reading_current FROM reading WHERE reading_id = %s;",
+            (reading_id,)
+        )
+        reading = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return reading if reading else None
+    
+    def get_reading_info_by_id(self, reading_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM READING WHERE reading_id = %s", (reading_id,))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result
 
     def create_reading(self, read_date, prev_read, pres_read, meter_id):
         conn = self.get_connection()
@@ -70,5 +71,54 @@ class ReadingRepository:
         cursor.close()
         conn.close()
         return new_reading_id
+    
+    def get_reading_id_by_billing_id(self, billing_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT reading_id FROM billing WHERE billing_id = %s", (billing_id,))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result[0] if result else None
+    
+    def void_reading(self, reading_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE reading SET is_voided = true WHERE reading_id = %s", (reading_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    def get_reading_by_current_and_meter(self, current_val, meter_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM READING
+            WHERE reading_current = %s
+            AND meter_id = %s
+            AND is_voided = false
+            ORDER BY reading_date DESC
+            LIMIT 1
+        """, (current_val, meter_id))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result
+    
+    def update_reading(self, reading_id, reading_date, reading_current):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE reading
+            SET reading_date = %s, reading_current = %s
+            WHERE reading_id = %s
+        """, (reading_date, reading_current, reading_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+
+
+
 
 
