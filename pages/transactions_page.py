@@ -17,11 +17,12 @@ def image_to_base64(path):
         return f"data:image/png;base64,{encoded}"
 
 class TransactionsPage(QtWidgets.QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, username=None, parent=None):
         super().__init__(parent)
-        self.all_transactions_data = []  # Store all transaction data
+        self.username = username
+        self.all_transactions_data = []
         self.current_page = 1
-        self.records_per_page = 10  # Number of records per page
+        self.records_per_page = 10
         self.total_pages = 1
         self.setup_ui()
         self.showMaximized()

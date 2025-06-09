@@ -17,6 +17,7 @@ from pages.transactions_page import TransactionsPage
 from pages.category_page import CategoryPage
 from pages.address_page import AddressPage
 from pages.logs_history_page import LogsAndHistoryPage
+from pages.billing_page import EmployeeBillingPage
 
 
 class AdminPanel(QMainWindow):
@@ -49,8 +50,9 @@ class AdminPanel(QMainWindow):
             "Categories":2,
             "Address": 3,
             "Meters": 4,
-            "Transactions": 5,
-            "Logs": 6
+            "Billing": 5,
+            "Transactions": 6,
+            "Logs": 7
         }
         
         # Create placeholder pages for all sections
@@ -101,6 +103,8 @@ class AdminPanel(QMainWindow):
             page = AddressPage(self.username)
         elif page_name == "Meters":  # This is now using MetersPage instead
             page = AdminMetersPage(self.username)
+        elif page_name == "Billing":  # This is now using MetersPage instead
+            page = EmployeeBillingPage(self.username)    
         elif page_name == "Transactions":
             page = TransactionsPage(self.username)
         elif page_name == "Logs":
@@ -179,6 +183,7 @@ class AdminPanel(QMainWindow):
             ("Categories", "../images/category.png"),
             ("Address", "../images/address.png"),
             ("Meters", "../images/meters.png"),
+            ("Billing", "../images/bill.png"),
             ("Transactions", "../images/transaction.png"),
             ("Logs", "../images/logs.png")
         ]:
