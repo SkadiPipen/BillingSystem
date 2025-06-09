@@ -326,5 +326,43 @@ class adminPageBack:
         cursor.close()
         conn.close()
 
+    def fetch_active_clients(self):
+        """
+        Fetches all active clients from the database.
+        Returns a list of tuples with selected fields.
+        """
+        try:
+            db = DBConnector()
+            conn = db.get_connection()
+            cursor = conn.cursor()
+
+            query = """
+                    SELECT c.CLIENT_ID, \
+                           c.CLIENT_NUMBER, \
+                           c.CLIENT_NAME, \
+                           c.CLIENT_MNAME, \
+                           c.CLIENT_LNAME, \
+                           c.CLIENT_STATUS, \
+                           m.METER_ID, \
+                           c.CATEG_ID
+                    FROM CLIENT c
+                             LEFT JOIN METER m ON c.METER_ID = m.METER_ID
+                    WHERE c.CLIENT_STATUS = 'Active'
+                    ORDER BY c.CLIENT_LNAME ASC, c.CLIENT_NAME ASC \
+                    """
+
+            cursor.execute(query)
+            result = cursor.fetchall()
+            return result
+
+        except Exception as e:
+            print("Error fetching active clients:", str(e))
+            return []
+
+        finally:
+            if conn:
+                cursor.close()
+                conn.close()
+
     
     

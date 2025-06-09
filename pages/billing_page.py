@@ -1800,7 +1800,7 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         
         # Set ACTION column to fixed width
         self.billing_table.horizontalHeader().setSectionResizeMode(8, QtWidgets.QHeaderView.Fixed)
-        self.billing_table.setColumnWidth(8, 80)
+        self.billing_table.setColumnWidth(8, 250)  # Adjust based on your needs
         
         # Enable horizontal scrollbar
         self.billing_table.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
@@ -1814,7 +1814,7 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         self.billing_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         # Reset ACTION column to fixed width after stretch
         self.billing_table.horizontalHeader().setSectionResizeMode(8, QtWidgets.QHeaderView.Fixed)
-        self.billing_table.setColumnWidth(8, 80)
+        self.billing_table.setColumnWidth(8, 250)
         
         self.billing_table.setSelectionBehavior(QtWidgets.QTableWidget.SelectRows)
         self.billing_table.verticalHeader().setVisible(False)
@@ -2251,21 +2251,18 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         form_layout.addLayout(create_labeled_widget("AMOUNT:", amount), 5, 0)
         form_layout.addLayout(create_labeled_widget("DUE DATE:", due_date), 6, 0)
 
-                
         IadminPageBack = adminPageBack()
-
         client.setEditable(True)
         client.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
         client.setStyleSheet(input_style)
         client.lineEdit().setReadOnly(False)
+        client.clear()
 
+        # Populate client ComboBox with active clients only
+        clients = IadminPageBack.fetch_active_clients()  # Use new method
         client_entries = []
         client_data_map = {}
 
-        clients = IadminPageBack.fetch_clients()
-        client.clear()
-
-        # Populate client ComboBox
         for client_data in clients:
             client_id = client_data[0]
             client_number = client_data[1]
