@@ -439,5 +439,49 @@ class adminPageBack:
             if conn:
                 conn.close()
 
+    def fetch_billing_to_issue(self):
+        try:
+            db = DBConnector()
+            conn = db.get_connection()
+            cursor = conn.cursor()
+
+            query = """
+                    SELECT b.billing_code, b.billing_due, c.client_name
+                    FROM billing b
+                             JOIN client c ON b.client_id = c.client_id
+                    WHERE b.billing_status = 'PRINTED' \
+                    """
+            cursor.execute(query)
+            result = cursor.fetchall()
+            return result
+        except Exception as e:
+            print("Error fetching billings for issuing:", str(e))
+            return []
+        finally:
+            if conn:
+                conn.close()
+
+    def fetch_billing_pending_payment(self):
+        try:
+            db = DBConnector()
+            conn = db.get_connection()
+            cursor = conn.cursor()
+
+            query = """
+                    SELECT b.billing_code, b.issued_date, c.client_name
+                    FROM billing b
+                             JOIN client c ON b.client_id = c.client_id
+                    WHERE b.billing_status = 'PENDING PAYMENT' \
+                    """
+            cursor.execute(query)
+            result = cursor.fetchall()
+            return result
+        except Exception as e:
+            print("Error fetching pending payments:", str(e))
+            return []
+        finally:
+            if conn:
+                conn.close()
+
     
     

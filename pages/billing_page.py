@@ -81,7 +81,205 @@ class BillWorker(QRunnable):
             self.signals.error.emit(str(e))
 
         finally:
-            pythoncom.CoUninitialize() 
+            pythoncom.CoUninitialize()
+
+class QuickIssueDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Quick Issue Billing")
+        self.setMinimumSize(800, 500)
+        self.billing_data = []
+        self.filtered_data = []
+        self.parent_window = parent
+
+        self.setup_ui()
+        self.load_billing_data()
+
+    def setup_ui(self):
+        layout = QtWidgets.QVBoxLayout(self)
+
+        # Search Bar
+        search_layout = QtWidgets.QHBoxLayout()
+        self.search_input = QtWidgets.QLineEdit()
+        self.search_input.setPlaceholderText("Search by Billing Code or Client Name...")
+        self.search_input.textChanged.connect(self.filter_table)
+        search_layout.addWidget(QtWidgets.QLabel("Search:"))
+        search_layout.addWidget(self.search_input)
+
+        layout.addLayout(search_layout)
+
+        # Table Setup
+        self.table = QtWidgets.QTableWidget()
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(["Select", "Billing Code", "Client Name"])
+        self.table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.table.setSortingEnabled(True)
+        layout.addWidget(self.table)
+
+        # Button Row
+        btn_layout = QtWidgets.QHBoxLayout()
+        self.issue_btn = QtWidgets.QPushButton("✅ Issue Selected Bills")
+        self.issue_btn.clicked.connect(self.on_issue_clicked)
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.issue_btn)
+
+        layout.addLayout(btn_layout)
+
+    def load_billing_data(self):
+        backend = adminPageBack()
+        raw_data = backend.fetch_billing_to_issue()  # You'll define this function
+        self.billing_data = raw_data
+        self.filtered_data = raw_data
+        self.update_table()
+
+    def filter_table(self):
+        query = self.search_input.text().strip().lower()
+        if not query:
+            self.filtered_data = self.billing_data
+        else:
+            self.filtered_data = [
+                row for row in self.billing_data
+                if query in row[0].lower() or query in row[2].lower()
+            ]
+        self.update_table()
+
+    def update_table(self):
+        self.table.setRowCount(len(self.filtered_data))
+        for i, (billing_code, issued_date, client_name) in enumerate(self.filtered_data):
+            checkbox = QtWidgets.QTableWidgetItem()
+            checkbox.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+            checkbox.setCheckState(QtCore.Qt.Unchecked)
+
+            self.table.setItem(i, 0, checkbox)
+            self.table.setItem(i, 1, QtWidgets.QTableWidgetItem(billing_code))
+            self.table.setItem(i, 2, QtWidgets.QTableWidgetItem(client_name))
+
+    def on_issue_clicked(self):
+        selected_rows = []
+        for i in range(self.table.rowCount()):
+            item = self.table.item(i, 0)
+            if item.checkState() == QtCore.Qt.Checked:
+                billing_code = self.table.item(i, 1).text()
+                for data in self.filtered_data:
+                    if data[0] == billing_code:
+                        selected_rows.append(data)
+                        break
+
+        if not selected_rows:
+            QtWidgets.QMessageBox.warning(self, "No Selection", "Please select at least one billing to issue.")
+            return
+
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            "Confirm Issue",
+            f"Are you sure you want to issue {len(selected_rows)} bill(s)?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+        )
+        if reply == QtWidgets.QMessageBox.Yes:
+            for billing in selected_rows:
+                # Call existing confirm_issue_bill without editing it
+                self.parent_window.confirm_issue_bill(self, billing)
+
+            self.accept()
+
+class QuickSetPaidDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Quick Set Paid")
+        self.setMinimumSize(800, 500)
+        self.billing_data = []
+        self.filtered_data = []
+        self.parent_window = parent
+
+        self.setup_ui()
+        self.load_billing_data()
+
+    def setup_ui(self):
+        layout = QtWidgets.QVBoxLayout(self)
+
+        # Search Bar
+        search_layout = QtWidgets.QHBoxLayout()
+        self.search_input = QtWidgets.QLineEdit()
+        self.search_input.setPlaceholderText("Search by Billing Code or Client Name...")
+        self.search_input.textChanged.connect(self.filter_table)
+        search_layout.addWidget(QtWidgets.QLabel("Search:"))
+        search_layout.addWidget(self.search_input)
+
+        layout.addLayout(search_layout)
+
+        # Table Setup
+        self.table = QtWidgets.QTableWidget()
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(["Select", "Billing Code", "Client Name"])
+        self.table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.table.setSortingEnabled(True)
+        layout.addWidget(self.table)
+
+        # Button Row
+        btn_layout = QtWidgets.QHBoxLayout()
+        self.paid_btn = QtWidgets.QPushButton("✅ Set Selected as Paid")
+        self.paid_btn.clicked.connect(self.on_paid_clicked)
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.paid_btn)
+
+        layout.addLayout(btn_layout)
+
+    def load_billing_data(self):
+        backend = adminPageBack()
+        raw_data = backend.fetch_billing_pending_payment()  # We'll define this
+        self.billing_data = raw_data
+        self.filtered_data = raw_data
+        self.update_table()
+
+    def filter_table(self):
+        query = self.search_input.text().strip().lower()
+        if not query:
+            self.filtered_data = self.billing_data
+        else:
+            self.filtered_data = [
+                row for row in self.billing_data
+                if query in row[0].lower() or query in row[2].lower()
+            ]
+        self.update_table()
+
+    def update_table(self):
+        self.table.setRowCount(len(self.filtered_data))
+        for i, (billing_code, issued_date, client_name) in enumerate(self.filtered_data):
+            checkbox = QtWidgets.QTableWidgetItem()
+            checkbox.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+            checkbox.setCheckState(QtCore.Qt.Unchecked)
+
+            self.table.setItem(i, 0, checkbox)
+            self.table.setItem(i, 1, QtWidgets.QTableWidgetItem(billing_code))
+            self.table.setItem(i, 2, QtWidgets.QTableWidgetItem(client_name))
+
+    def on_paid_clicked(self):
+        selected_rows = []
+        for i in range(self.table.rowCount()):
+            item = self.table.item(i, 0)
+            if item.checkState() == QtCore.Qt.Checked:
+                billing_code = self.table.item(i, 1).text()
+                for data in self.filtered_data:
+                    if data[0] == billing_code:
+                        selected_rows.append(data)
+                        break
+
+        if not selected_rows:
+            QtWidgets.QMessageBox.warning(self, "No Selection", "Please select at least one billing to mark as paid.")
+            return
+
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            "Confirm Payment",
+            f"Mark {len(selected_rows)} bill(s) as PAID?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+        )
+        if reply == QtWidgets.QMessageBox.Yes:
+            for billing in selected_rows:
+                # Call existing mark_billing_as_paid without editing it
+                self.parent_window.mark_billing_as_paid(billing)
+
+            self.accept()
 
 
 class EmployeeBillingPage(QtWidgets.QWidget):
@@ -1165,8 +1363,13 @@ class EmployeeBillingPage(QtWidgets.QWidget):
             except Exception as e:
                 QtWidgets.QMessageBox.critical(preview_window, "Error", f"Failed to issue billing: {e}")
 
+    def open_quick_issue_dialog(self):
+        dialog = QuickIssueDialog(parent=self)
+        dialog.exec_()
 
-
+    def open_quick_set_paid_dialog(self):
+        dialog = QuickSetPaidDialog(parent=self)
+        dialog.exec_()
 
     def confirm_void_bill(self, preview_window, billing_data):
         reply = QtWidgets.QMessageBox.question(
@@ -1762,6 +1965,44 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         """)
         add_btn.clicked.connect(self.show_add_billing)
         search_add_layout.addWidget(add_btn)
+
+        # Quick Set Paid Button
+        quick_paid_btn = QtWidgets.QPushButton("✅ Quick Set Paid")
+        quick_paid_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 8px 15px;
+                border-radius: 4px;
+                font-family: 'Roboto', sans-serif;
+                min-width: 140px;
+            }
+            QPushButton:hover {
+                background-color: #388E3C;
+            }
+        """)
+        quick_paid_btn.clicked.connect(self.open_quick_set_paid_dialog)
+
+        search_add_layout.addWidget(quick_paid_btn)
+
+        # Quick Issue Billing Button
+        quick_issue_btn = QtWidgets.QPushButton("⚡ Quick Issue Billing")
+        quick_issue_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FFA726;
+                color: white;
+                padding: 8px 15px;
+                border-radius: 4px;
+                font-family: 'Roboto', sans-serif;
+                min-width: 140px;
+            }
+            QPushButton:hover {
+                background-color: #FB8C00;
+            }
+        """)
+        quick_issue_btn.clicked.connect(self.open_quick_issue_dialog)
+
+        search_add_layout.addWidget(quick_issue_btn)
         
         # Add search_add_layout to header_layout
         header_layout.addLayout(search_add_layout)
@@ -1799,7 +2040,7 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         
         # Set ACTION column to fixed width
         self.billing_table.horizontalHeader().setSectionResizeMode(8, QtWidgets.QHeaderView.Fixed)
-        self.billing_table.setColumnWidth(8, 250)  # Adjust based on your needs
+        self.billing_table.setColumnWidth(8, 350)  # Adjust based on your needs
         
         # Enable horizontal scrollbar
         self.billing_table.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
@@ -1813,7 +2054,7 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         self.billing_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         # Reset ACTION column to fixed width after stretch
         self.billing_table.horizontalHeader().setSectionResizeMode(8, QtWidgets.QHeaderView.Fixed)
-        self.billing_table.setColumnWidth(8, 250)
+        self.billing_table.setColumnWidth(8, 350)
         
         self.billing_table.setSelectionBehavior(QtWidgets.QTableWidget.SelectRows)
         self.billing_table.verticalHeader().setVisible(False)
