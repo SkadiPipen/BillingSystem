@@ -11,12 +11,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from pages.admin_dashboard_page import AdminDashboardPage
-from pages.meters_page import MetersPage
+from pages.admin_meters_page import AdminMetersPage
 from pages.admin_customers_page import AdminCustomersPage
 from pages.transactions_page import TransactionsPage
 from pages.category_page import CategoryPage
 from pages.address_page import AddressPage
 from pages.logs_history_page import LogsAndHistoryPage
+from pages.billing_page import EmployeeBillingPage
 
 
 class AdminPanel(QMainWindow):
@@ -49,8 +50,9 @@ class AdminPanel(QMainWindow):
             "Categories":2,
             "Address": 3,
             "Meters": 4,
-            "Transactions": 5,
-            "Logs": 6
+            "Billing": 5,
+            "Transactions": 6,
+            "Logs": 7
         }
         
         # Create placeholder pages for all sections
@@ -100,7 +102,9 @@ class AdminPanel(QMainWindow):
         elif page_name == "Address":
             page = AddressPage(self.username)
         elif page_name == "Meters":  # This is now using MetersPage instead
-            page = MetersPage(self.username)
+            page = AdminMetersPage(self.username)
+        elif page_name == "Billing":  # This is now using MetersPage instead
+            page = EmployeeBillingPage(self.username)    
         elif page_name == "Transactions":
             page = TransactionsPage(self.username)
         elif page_name == "Logs":
@@ -179,6 +183,7 @@ class AdminPanel(QMainWindow):
             ("Categories", "../images/category.png"),
             ("Address", "../images/address.png"),
             ("Meters", "../images/meters.png"),
+            ("Billing", "../images/bill.png"),
             ("Transactions", "../images/transaction.png"),
             ("Logs", "../images/logs.png")
         ]:
@@ -296,15 +301,20 @@ class AdminPanel(QMainWindow):
     def setup_main_content(self):
         # Create stacked widget for different pages
         self.stacked_widget = QtWidgets.QStackedWidget()
-        
+
         # Create green header bar
         header_bar = QtWidgets.QWidget()
         header_bar.setStyleSheet("background-color: rgb(201, 235, 203);")
         header_bar.setFixedHeight(70)
-        
+
         header_layout = QtWidgets.QHBoxLayout(header_bar)
         header_layout.setContentsMargins(20, 0, 20, 0)
-        
+
+        # Spacer to push center label to the center
+        left_spacer = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        right_spacer = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+
+        # Full name centered label
         full_name = QtWidgets.QLabel("SouthWestern Barangays Water Services Cooperative II")
         full_name.setStyleSheet("""
             color: rgb(60, 60, 60);
@@ -313,19 +323,34 @@ class AdminPanel(QMainWindow):
             font-weight: 600;
         """)
         full_name.setAlignment(QtCore.Qt.AlignCenter)
-        header_layout.addWidget(full_name)
-        
+
+        # Right-side user label
+        user_label = QtWidgets.QLabel(f"User: {self.username}")
+        user_label.setStyleSheet("""
+            color: rgb(60, 60, 60);
+            font-size: 14px;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 500;
+        """)
+        user_label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+
+        # Use a layered widget to keep full_name centered
+        header_layout.addItem(left_spacer)
+        header_layout.addWidget(full_name, alignment=QtCore.Qt.AlignCenter)
+        header_layout.addItem(right_spacer)
+        header_layout.addWidget(user_label, alignment=QtCore.Qt.AlignRight)
+
         # Create container for stacked widget and header
         container = QtWidgets.QWidget()
         container_layout = QtWidgets.QVBoxLayout(container)
         container_layout.setContentsMargins(0, 0, 0, 0)
         container_layout.setSpacing(0)
-        
+
         container_layout.addWidget(header_bar)
         container_layout.addWidget(self.stacked_widget)
-        
+
         self.main_layout.addWidget(container)
-    
+
 
 # Add this at the very end of the file:
 if __name__ == "__main__":

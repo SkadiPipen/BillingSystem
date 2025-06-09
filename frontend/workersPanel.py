@@ -10,10 +10,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from PyQt5 import QtCore, QtGui, QtWidgets
 from pages.employee_customers_page import EmployeeCustomersPage
 from pages.billing_page import EmployeeBillingPage
-from pages.category_page import CategoryPage
-from pages.address_page import AddressPage
 from pages.transactions_page import TransactionsPage
-from pages.meters_page import MetersPage
+from pages.employee_meters_page import EmployeeMetersPage
 
 class WorkersPanel(QtWidgets.QMainWindow):
     def __init__(self, username=None):
@@ -41,11 +39,9 @@ class WorkersPanel(QtWidgets.QMainWindow):
         self.pages = {}
         self.page_indices = {
             "Customers": 0,
-            "Categories": 1,
-            "Address": 2,
-            "Meters": 3,  # Added Meters page index
-            "Billing": 4,
-            "Transactions": 5
+            "Meters": 1,  # Added Meters page index
+            "Billing": 2,
+            "Transactions": 3
         }
         
         # Create placeholder pages
@@ -60,26 +56,30 @@ class WorkersPanel(QtWidgets.QMainWindow):
     def setup_main_content(self):
         # Create stacked widget for different pages
         self.stacked_widget = QtWidgets.QStackedWidget()
-        
+
         # Create green header bar
         header_bar = QtWidgets.QWidget()
         header_bar.setStyleSheet("background-color: rgb(201, 235, 203);")
         header_bar.setFixedHeight(70)
-        
+
         header_layout = QtWidgets.QHBoxLayout(header_bar)
         header_layout.setContentsMargins(20, 0, 20, 0)
-        
-        # Add company name on the left
-        company_name = QtWidgets.QLabel("SouthWestern Barangays Water Services Cooperative II")
-        company_name.setStyleSheet("""
+
+        # Spacer to push center label to the center
+        left_spacer = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        right_spacer = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+
+        # Full name centered label
+        full_name = QtWidgets.QLabel("SouthWestern Barangays Water Services Cooperative II")
+        full_name.setStyleSheet("""
             color: rgb(60, 60, 60);
             font-size: 16px;
             font-family: 'Poppins', sans-serif;
             font-weight: 600;
         """)
-        header_layout.addWidget(company_name)
-        
-        # Add username on the right
+        full_name.setAlignment(QtCore.Qt.AlignCenter)
+
+        # Right-side user label
         user_label = QtWidgets.QLabel(f"User: {self.username}")
         user_label.setStyleSheet("""
             color: rgb(60, 60, 60);
@@ -88,17 +88,22 @@ class WorkersPanel(QtWidgets.QMainWindow):
             font-weight: 500;
         """)
         user_label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
-        header_layout.addWidget(user_label)
-        
+
+        # Use a layered widget to keep full_name centered
+        header_layout.addItem(left_spacer)
+        header_layout.addWidget(full_name, alignment=QtCore.Qt.AlignCenter)
+        header_layout.addItem(right_spacer)
+        header_layout.addWidget(user_label, alignment=QtCore.Qt.AlignRight)
+
         # Create container for stacked widget and header
         container = QtWidgets.QWidget()
         container_layout = QtWidgets.QVBoxLayout(container)
         container_layout.setContentsMargins(0, 0, 0, 0)
         container_layout.setSpacing(0)
-        
+
         container_layout.addWidget(header_bar)
         container_layout.addWidget(self.stacked_widget)
-        
+
         self.main_layout.addWidget(container)
 
     def create_placeholders(self):
@@ -131,17 +136,13 @@ class WorkersPanel(QtWidgets.QMainWindow):
         # Create the page
         page = None
         if page_name == "Customers":
-            page = EmployeeCustomersPage(self)
-        elif page_name == "Categories":
-            page = CategoryPage(self)
-        elif page_name == "Address":
-            page = AddressPage(self)
+            page = EmployeeCustomersPage(self.username)
         elif page_name == "Meters":
-            page = MetersPage(self)    
+            page = EmployeeMetersPage(self.username)
         elif page_name == "Billing":
-            page = EmployeeBillingPage(self)
+            page = EmployeeBillingPage(self.username)
         elif page_name == "Transactions":
-            page = TransactionsPage(self)
+            page = TransactionsPage(self.username)
         
         if page:
             # Replace the placeholder with the actual page
@@ -212,8 +213,6 @@ class WorkersPanel(QtWidgets.QMainWindow):
         self.nav_buttons = []
         for text, icon_path in [
             ("Customers", "../images/clients.png"),
-            ("Categories", "../images/category.png"),
-            ("Address", "../images/address.png"),
             ("Meters", "../images/meters.png"),  # Added Meters button
             ("Billing", "../images/bill.png"),
             ("Transactions", "../images/transaction.png")

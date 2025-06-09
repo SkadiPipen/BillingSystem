@@ -103,7 +103,12 @@ class MeterRepository:
     def get_readings_by_meter_id(self, meter_id):
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM READING WHERE METER_ID = %s ORDER BY READING_DATE DESC", (meter_id,))
+        cursor.execute("""
+                       SELECT reading_date, reading_prev, reading_current, is_voided
+                       FROM READING
+                       WHERE METER_ID = %s
+                       ORDER BY READING_DATE DESC
+                       """, (meter_id,))
         readings = cursor.fetchall()
         cursor.close()
         conn.close()

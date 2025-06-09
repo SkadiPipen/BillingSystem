@@ -1,19 +1,34 @@
 import warnings
+
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import sys
 import os
 import math
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QMessageBox
+from PyQt5.QtPrintSupport import QPrinter, QPrintPreviewDialog
+from PyQt5.QtGui import QTextDocument
 
 from backend.adminBack import adminPageBack
+import base64
+
+
+def image_to_base64(path):
+    import base64
+    with open(path, "rb") as image_file:
+        encoded = base64.b64encode(image_file.read()).decode("utf-8")
+        return f"data:image/png;base64,{encoded}"
+
 
 class EmployeeCustomersPage(QtWidgets.QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, username, parent=None):
         super().__init__()
         self.parent = parent
+        self.username = username
+        self.IadminPageBack = adminPageBack(self.username)
         self.all_customers_data = []  # Store all customer data
         self.current_page = 1
         self.records_per_page = 10  # Number of records per page
@@ -23,8 +38,7 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
 
     def create_scrollable_cell(self, row, column, text):
         scrollable_widget = ScrollableTextWidget(text)
-        self.customers_table.setCellWidget(row, column, scrollable_widget)    
-        
+        self.customers_table.setCellWidget(row, column, scrollable_widget)
 
     def setup_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
@@ -42,11 +56,11 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
         header_layout.addStretch()
 
         # Search and Add button container
-        search_add_layout = QtWidgets.QHBoxLayout() 
-        
+        search_add_layout = QtWidgets.QHBoxLayout()
+
         # Search container
         search_container = QtWidgets.QHBoxLayout()
-        
+
         # Search criteria dropdown
         self.search_criteria = QtWidgets.QComboBox()
         self.search_criteria.addItems(["First Name", "Last Name", "Location", "Category", "Active", "Inactive"])
@@ -69,14 +83,14 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
             }
         """)
         search_container.addWidget(self.search_criteria)
-        
+
         # Search input
         self.search_input = QtWidgets.QLineEdit()
         self.search_input.setPlaceholderText("Search customers...")
         self.search_input_combo = QtWidgets.QComboBox()
         self.search_input_combo.addItems(["Residential", "Commercial", "Industrial"])
         self.search_input_combo.hide()  # Initially hidden
-        
+
         # Apply same styling to both widgets
         input_style = """
             QLineEdit, QComboBox {
@@ -89,19 +103,19 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
         """
         self.search_input.setStyleSheet(input_style)
         self.search_input_combo.setStyleSheet(input_style)
-        
+
         self.search_input.textChanged.connect(self.filter_table)
         self.search_input_combo.currentTextChanged.connect(self.filter_table)
-        
+
         # Add widgets to container
         search_container.addWidget(self.search_input)
         search_container.addWidget(self.search_input_combo)
-        
+
         # Connect search criteria change
         self.search_criteria.currentTextChanged.connect(self.toggle_search_input)
-        
+
         search_add_layout.addLayout(search_container)
-        
+
         # Add button with icon
         add_btn = QtWidgets.QPushButton("ADD CUSTOMER", icon=QtGui.QIcon("../images/add.png"))
         add_btn.setStyleSheet("""
@@ -118,9 +132,9 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
         """)
         add_btn.clicked.connect(self.show_add_customer_page)
         search_add_layout.addWidget(add_btn)
-        
+
         header_layout.addLayout(search_add_layout)
-        layout.addLayout(header_layout) 
+        layout.addLayout(header_layout)
 
         # Table setup
         self.customers_table = QtWidgets.QTableWidget()
@@ -148,7 +162,6 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
             }
         """)
 
-        
         # Set up columns (9 columns)
         self.customers_table.setColumnCount(11)
         self.customers_table.verticalHeader().setVisible(False)
@@ -160,47 +173,47 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
         # Set the table to fill all available space
         self.customers_table.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.customers_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        
+
         # Enable horizontal scrollbar
         self.customers_table.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.customers_table.setWordWrap(False)
-        
+
         customer_back = adminPageBack()
         data = customer_back.fetch_clients()
         self.all_customers_data = data  # Store all customer data
-        
+
         # Add pagination controls
         pagination_layout = QtWidgets.QHBoxLayout()
         pagination_layout.setAlignment(QtCore.Qt.AlignCenter)
-        
+
         # First page button
         self.first_page_btn = QtWidgets.QPushButton("⏮ First")
         self.first_page_btn.clicked.connect(self.go_to_first_page)
-        
+
         # Previous page button
         self.prev_page_btn = QtWidgets.QPushButton("◀ Previous")
         self.prev_page_btn.clicked.connect(self.go_to_prev_page)
-        
+
         # Page indicator
         self.page_indicator = QtWidgets.QLabel("Page 1 of 1")
         self.page_indicator.setAlignment(QtCore.Qt.AlignCenter)
         self.page_indicator.setStyleSheet("font-weight: bold; min-width: 150px;")
-        
+
         # Next page button
         self.next_page_btn = QtWidgets.QPushButton("Next ▶")
         self.next_page_btn.clicked.connect(self.go_to_next_page)
-        
+
         # Last page button
         self.last_page_btn = QtWidgets.QPushButton("Last ⏭")
         self.last_page_btn.clicked.connect(self.go_to_last_page)
-        
+
         # Records per page selector
         self.page_size_label = QtWidgets.QLabel("Records per page:")
         self.page_size_combo = QtWidgets.QComboBox()
         self.page_size_combo.addItems(["5", "10", "20", "50", "100"])
         self.page_size_combo.setCurrentText(str(self.records_per_page))
         self.page_size_combo.currentTextChanged.connect(self.change_page_size)
-        
+
         # Style for pagination buttons
         pagination_btn_style = """
             QPushButton {
@@ -218,12 +231,12 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
                 color: #9E9E9E;
             }
         """
-        
+
         self.first_page_btn.setStyleSheet(pagination_btn_style)
         self.prev_page_btn.setStyleSheet(pagination_btn_style)
         self.next_page_btn.setStyleSheet(pagination_btn_style)
         self.last_page_btn.setStyleSheet(pagination_btn_style)
-        
+
         # Add pagination controls to layout
         pagination_layout.addWidget(self.first_page_btn)
         pagination_layout.addWidget(self.prev_page_btn)
@@ -233,15 +246,15 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
         pagination_layout.addSpacing(20)
         pagination_layout.addWidget(self.page_size_label)
         pagination_layout.addWidget(self.page_size_combo)
-        
+
         # Calculate total pages and update table
         self.update_pagination()
-        
+
         # Adjust table properties
         self.customers_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.customers_table.setSelectionBehavior(QtWidgets.QTableWidget.SelectRows)
         self.customers_table.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
-        
+
         # Create a custom delegate for text elision with tooltip
         delegate = TextEllipsisDelegate(self.customers_table)
         self.customers_table.setItemDelegate(delegate)
@@ -250,28 +263,34 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
         layout.addWidget(self.customers_table)
         layout.addLayout(pagination_layout)
 
+        # Print Preview button
+        print_btn = QtWidgets.QPushButton("PRINT PREVIEW", icon=QtGui.QIcon("../images/print.png"))
+        print_btn.setStyleSheet(add_btn.styleSheet())
+        print_btn.clicked.connect(self.show_print_preview)
+        search_add_layout.addWidget(print_btn)
+
     def update_pagination(self):
         # Calculate total pages based on filtered data
         visible_rows = 0
         for row in range(len(self.all_customers_data)):
             if not self.is_row_filtered(row):
                 visible_rows += 1
-        
+
         self.total_pages = max(1, math.ceil(visible_rows / self.records_per_page))
-        
+
         # Adjust current page if it's beyond the new total
         if self.current_page > self.total_pages:
             self.current_page = self.total_pages
-        
+
         # Update page indicator
         self.page_indicator.setText(f"Page {self.current_page} of {self.total_pages}")
-        
+
         # Enable/disable navigation buttons
         self.first_page_btn.setEnabled(self.current_page > 1)
         self.prev_page_btn.setEnabled(self.current_page > 1)
         self.next_page_btn.setEnabled(self.current_page < self.total_pages)
         self.last_page_btn.setEnabled(self.current_page < self.total_pages)
-        
+
         # Update table with current page data
         self.populate_table(self.all_customers_data)
 
@@ -335,26 +354,26 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
 
     def populate_table(self, data):
         self.customers_table.setRowCount(0)  # Clear previous rows
-        
+
         # Apply pagination and filtering
         visible_row_counter = 0
         rows_to_show = []
-        
+
         # First pass: determine which rows are visible based on filters
         for row_index, customer in enumerate(data):
             if not self.is_row_filtered(row_index):
                 visible_row_counter += 1
-                
+
                 # Check if this row should be on the current page
                 start_index = (self.current_page - 1) * self.records_per_page + 1
                 end_index = self.current_page * self.records_per_page
-                
+
                 if start_index <= visible_row_counter <= end_index:
                     rows_to_show.append(customer)
-        
+
         # Set row count for visible rows on current page
         self.customers_table.setRowCount(len(rows_to_show))
-        
+
         # Populate only the rows that should be visible on this page
         for table_row, customer in enumerate(rows_to_show):
             client_id, client_number, fname, middle_name, lname, contact, categ_name, address_id, location, created_at, status = customer
@@ -430,7 +449,6 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
             action_container.setLayout(action_layout)
             self.customers_table.setCellWidget(table_row, 10, action_container)
 
-
     def filter_table(self):
         # Just need to update pagination, which will apply filters automatically
         self.current_page = 1  # Reset to first page when filtering
@@ -442,75 +460,56 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
             self.search_input_combo.show()
         else:
             self.search_input.show()
-            self.search_input_combo.hide() 
-        
-        # Update filtering when search type changes
+            self.search_input_combo.hide()
+
+            # Update filtering when search type changes
         self.filter_table()
 
     def toggle_status(self, row, label):
         table = self.customers_table
-        container = table.cellWidget(row, 8)
+        container = table.cellWidget(row, 9)  # Status column index
         if container:
             toggle_button = container.findChild(QtWidgets.QPushButton)
             if toggle_button:
-                # Store the current status before the button toggles
-                current_status = toggle_button.isChecked()
-                next_status = not current_status
-                next_status_label = "Active" if next_status else "Inactive"
+                # Get client_id from customer data
+                visible_index = 0
+                selected_customer = None
+                for idx, customer in enumerate(self.all_customers_data):
+                    if not self.is_row_filtered(idx):
+                        if visible_index == row:
+                            selected_customer = customer
+                            break
+                        visible_index += 1
 
-                # Block the toggle signal to prevent automatic state change
+                if not selected_customer:
+                    QtWidgets.QMessageBox.warning(self, "Error", "Customer not found.")
+                    return
+
+                client_id = selected_customer[0]
+                current_status = selected_customer[10].capitalize()  # Ensure case for enum
+                next_status = 'Inactive' if current_status == 'Active' else 'Active'
+
                 toggle_button.blockSignals(True)
 
-                # Ask for confirmation
-                reply = QtWidgets.QMessageBox.question(
+                reply = QMessageBox.question(
                     self,
                     "Confirm Status Change",
-                    f"Are you sure you want to change the status to {next_status_label}?",
-                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+                    f"Are you sure you want to change the status to {next_status}?",
+                    QMessageBox.Yes | QMessageBox.No
                 )
 
-                if reply == QtWidgets.QMessageBox.Yes:
-                    try:
-                        # Get client_id from the original data
-                        visible_index = 0
-                        client_index = -1
-                        for row_index, customer in enumerate(self.all_customers_data):
-                            if not self.is_row_filtered(row_index):
-                                if visible_index == row:
-                                    client_index = row_index
-                                    break
-                                visible_index += 1
-
-                        if client_index == -1:
-                            raise Exception("Customer not found")
-
-                        customer = self.all_customers_data[client_index]
-                        client_id = customer[0]  # assuming client_id is first item in tuple
-
-                        # Update status in the database
-                        admin_back = adminPageBack()
-                        admin_back.update_client_status(client_id, next_status_label)
-
-                        # Update UI
-                        toggle_button.setChecked(next_status)
-                        if next_status:
-                            label.setText("Active")
-                            label.setStyleSheet("color: #4CAF50; font-weight: bold;")
-                        else:
-                            label.setText("Inactive")
-                            label.setStyleSheet("color: #E57373; font-weight: bold;")
-
-                        QtWidgets.QMessageBox.information(self, "Success", "Status updated successfully.")
-                        
-                    except Exception as e:
-                        QtWidgets.QMessageBox.critical(self, "Error", f"Failed to update status: {str(e)}")
-                        toggle_button.setChecked(current_status)  # Revert
+                if reply == QMessageBox.Yes:
+                    self.IadminPageBack.update_client_status(client_id, next_status)
+                    label.setText(next_status)
+                    label.setStyleSheet(
+                        f"color: {'#4CAF50' if next_status == 'Active' else '#E57373'}; font-weight: bold;")
+                    toggle_button.setChecked(next_status == "Active")
                 else:
-                    # Revert the button's checked state
-                    toggle_button.setChecked(current_status)
+                    toggle_button.setChecked(current_status == "Active")
 
-                # Re-enable signals
                 toggle_button.blockSignals(False)
+
+
 
     def show_add_customer_page(self):
         add_dialog = QtWidgets.QDialog(self)
@@ -579,11 +578,12 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
             widget.setStyleSheet(input_style)
 
         # Fetch backend data
-        IadminPageBack = adminPageBack()
-        for category_id, category_name, category_status, category_date in IadminPageBack.fetch_categories():
-            fields["Category"].addItem(category_name, category_id)
-        for address_id, address_name, address_status, address_date in IadminPageBack.fetch_address():
-            fields["Address"].addItem(address_name, address_id)
+        for category_id, category_name, category_status, category_date in self.IadminPageBack.fetch_categories():
+            if category_status == 'Active':
+                fields["Category"].addItem(category_name, category_id)
+        for address_id, address_name, address_status, address_date in self.IadminPageBack.fetch_address():
+            if address_status == 'Active':
+                fields["Address"].addItem(address_name, address_id)
 
         # Layout inputs in 2 columns
         left_fields = ["First Name", "Middle Name", "Last Name", "Contact Number", "Category"]
@@ -621,7 +621,7 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
         save_btn = QtWidgets.QPushButton("Save Customer")
         save_btn.setStyleSheet("""
             QPushButton {
-                background-color: white;
+                background-color: #81C784;
                 color: white;
                 padding: 8px 15px;
                 border-radius: 4px;
@@ -629,7 +629,7 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
                 min-width: 100px;
             }
             QPushButton:hover {
-                background-color: #c0392b;
+                background-color: #66BB6A;
             }
         """)
 
@@ -639,7 +639,11 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
             category_id = category_combo.currentData()
             address_id = address_combo.currentData()
 
-            input_values = {label: widget.text().strip() if isinstance(widget, QtWidgets.QLineEdit) else widget.currentText().strip() for label, widget in fields.items()}
+            input_values = {
+                label: widget.text().strip() if isinstance(widget, QtWidgets.QLineEdit)
+                else widget.currentText().strip()
+                for label, widget in fields.items()
+            }
 
             missing_fields = [label for label in fields if label != "Middle Name" and not input_values[label]]
             if missing_fields:
@@ -647,9 +651,11 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
                 return
 
             name_fields = ["First Name", "Middle Name", "Last Name"]
-            invalid_name_fields = [label for label in name_fields if input_values[label] and not input_values[label].replace(" ", "").isalpha()]
+            invalid_name_fields = [label for label in name_fields if
+                                   input_values[label] and not input_values[label].replace(" ", "").isalpha()]
             if invalid_name_fields:
-                QtWidgets.QMessageBox.warning(self, "Error", f"These fields must contain letters only: {', '.join(invalid_name_fields)}")
+                QtWidgets.QMessageBox.warning(self, "Error",
+                                              f"These fields must contain letters only: {', '.join(invalid_name_fields)}")
                 return
 
             try:
@@ -664,8 +670,14 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
                 QtWidgets.QMessageBox.warning(self, "Error", "First Reading must be a number.")
                 return
 
-            meter_id = IadminPageBack.add_meter(meter_reading, input_values["Serial Number"])
-            new_client_id = IadminPageBack.add_client(
+            serial_number = input_values["Serial Number"]
+            # ✅ Check if the serial number already exists
+            if self.IadminPageBack.serial_exists(serial_number):
+                QtWidgets.QMessageBox.warning(self, "Duplicate Serial", "This serial number is already registered.")
+                return
+
+            meter_id = self.IadminPageBack.add_meter(meter_reading, serial_number)
+            new_client_id = self.IadminPageBack.add_client(
                 client_name=input_values["First Name"],
                 client_lname=input_values["Last Name"],
                 client_contact_num=input_values["Contact Number"],
@@ -679,9 +691,8 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
 
             QtWidgets.QMessageBox.information(self, "Success", "Customer added successfully.")
             add_dialog.accept()
-            
-            # Refresh all data
-            self.all_customers_data = IadminPageBack.fetch_clients()
+
+            self.all_customers_data = self.IadminPageBack.fetch_clients()
             self.update_pagination()
 
         save_btn.clicked.connect(save_customer)
@@ -821,7 +832,8 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
 
         edit_dialog.exec_()
 
-    def save_edited_customer(self, client_id, fname_input, mname_input, lname_input, contact_input, location_input, dialog):
+    def save_edited_customer(self, client_id, fname_input, mname_input, lname_input, contact_input, location_input,
+                         dialog):
         fname = fname_input.text().strip()
         mname = mname_input.text().strip()
         lname = lname_input.text().strip()
@@ -834,8 +846,8 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
             return
 
         try:
-            admin_back = adminPageBack()
-            admin_back.update_client(
+            # Use the existing instance with correct username instead of creating new one
+            self.IadminPageBack.update_client(
                 client_id,
                 fname,
                 lname,
@@ -845,39 +857,123 @@ class EmployeeCustomersPage(QtWidgets.QWidget):
             )
 
             # Refresh UI
-            self.all_customers_data = admin_back.fetch_clients()
+            self.all_customers_data = self.IadminPageBack.fetch_clients()
             self.update_pagination()
             QtWidgets.QMessageBox.information(dialog, "Success", "Customer updated successfully.")
             dialog.accept()
         except Exception as e:
-            QtWidgets.QMessageBox.critical(dialog, "Error", f"Failed to update customer: {str(e)}")  
+            QtWidgets.QMessageBox.critical(dialog, "Error", f"Failed to update customer: {str(e)}")
+
+    def show_print_preview(self):
+        # Load logo as base64
+        logo_path = os.path.join(os.path.dirname(__file__), "..", "images", "logosowbasco.png")
+        logo_base64 = image_to_base64(logo_path)
+
+        html = f"""
+        <table width="100%" style="border-collapse: collapse;">
+          <tr>
+            <td style="width: 1px; padding-right: 10px; vertical-align: top;">
+              <img src="{logo_base64}" width="120">
+            </td>
+            <td style="text-align: center;">
+              <div style="font-family: Arial, sans-serif; line-height: 1.1;">
+                <div style="font-size: 14pt; font-weight: bold;">Southwestern Barangays Water Service Cooperative II</div>
+                <div style="font-size: 11pt; font-weight: bold;">(SOWBASCO)</div>
+                <div style="font-size: 10pt;">Consuelo, San Francisco, Cebu</div>
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <hr style="margin: 8px 0;">
+
+        <div style="text-align: center; font-weight: bold; font-size: 11pt; margin-bottom: 10px;">List of Clients</div>
+
+        <table border="1" cellspacing="0" cellpadding="5" width="100%">
+          <thead>
+            <tr>
+              <th>Client No.</th>
+              <th>First Name</th>
+              <th>Middle Name</th>
+              <th>Last Name</th>
+              <th>Contact</th>
+              <th>Category</th>
+              <th>Address</th>
+              <th>Location</th>
+              <th>Date Created</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+        """
+
+        visible_data = []
+        visible_index = 0
+        start = (self.current_page - 1) * self.records_per_page + 1
+        end = self.current_page * self.records_per_page
+
+        for row_index, customer in enumerate(self.all_customers_data):
+            if not self.is_row_filtered(row_index):
+                visible_index += 1
+                if start <= visible_index <= end:
+                    visible_data.append(customer)
+
+        for customer in visible_data:
+            client_id, client_number, fname, mname, lname, contact, category, address, location, date_created, status = customer
+            html += f"""
+            <tr>
+                <td>{client_number}</td>
+                <td>{fname}</td>
+                <td>{mname}</td>
+                <td>{lname}</td>
+                <td>{contact}</td>
+                <td>{category}</td>
+                <td>{address}</td>
+                <td>{location}</td>
+                <td>{date_created}</td>
+                <td>{status}</td>
+            </tr>
+            """
+
+        html += "</tbody></table>"
+
+        # Create document and print preview
+        document = QTextDocument()
+        document.setHtml(html)
+
+        printer = QPrinter(QPrinter.HighResolution)
+        preview_dialog = QPrintPreviewDialog(printer, self)
+        preview_dialog.setWindowTitle("Print Preview - Customer List")
+        preview_dialog.paintRequested.connect(document.print_)
+        preview_dialog.exec_()
+        self.IadminPageBack.log_action("Printed customer list preview")
 
 
 class ScrollableTextWidget(QtWidgets.QWidget):
-    
+
     def __init__(self, text, parent=None):
         super(ScrollableTextWidget, self).__init__(parent)
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        
+
         # Create scrollable text area
         self.text_area = QtWidgets.QScrollArea()
         self.text_area.setWidgetResizable(True)
-        self.text_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)  
+        self.text_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.text_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.text_area.setFrameShape(QtWidgets.QFrame.NoFrame)
-        
+
         # Create a label with the text
         self.label = QtWidgets.QLabel(text)
         self.label.setTextFormat(QtCore.Qt.PlainText)
         self.label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        
+
         # Add label to scroll area
         self.text_area.setWidget(self.label)
-        
+
         # Add scroll area to layout
         layout.addWidget(self.text_area)
-        
+
         # Set the widget's style
         self.setStyleSheet("""
             QScrollArea {
@@ -902,16 +998,16 @@ class ScrollableTextWidget(QtWidgets.QWidget):
                 width: 0px;
             }
         """)
-        
+
         # Add tooltip for the full text
         self.setToolTip(text)
 
         # Install event filter to track mouse events
         self.installEventFilter(self)
-        
+
     def text(self):
         return self.label.text()
-    
+
     def eventFilter(self, obj, event):
         if obj is self:
             if event.type() == QtCore.QEvent.Enter:
@@ -926,23 +1022,23 @@ class ScrollableTextWidget(QtWidgets.QWidget):
 
 
 class TextEllipsisDelegate(QtWidgets.QStyledItemDelegate):
-    
+
     def __init__(self, parent=None):
         super(TextEllipsisDelegate, self).__init__(parent)
-        
+
     def paint(self, painter, option, index):
         # Use default painting
         super(TextEllipsisDelegate, self).paint(painter, option, index)
-        
+
     def helpEvent(self, event, view, option, index):
         # Show tooltip when hovering if text is truncated
         if not event or not view:
             return False
-            
+
         if event.type() == QtCore.QEvent.ToolTip:
             # Get the cell widget
             cell_widget = view.cellWidget(index.row(), index.column())
-            
+
             if cell_widget and isinstance(cell_widget, ScrollableTextWidget):
                 # Show tooltip for ScrollableTextWidget
                 QtWidgets.QToolTip.showText(event.globalPos(), cell_widget.text(), view)
@@ -955,15 +1051,15 @@ class TextEllipsisDelegate(QtWidgets.QStyledItemDelegate):
                     width = option.rect.width()
                     metrics = QtGui.QFontMetrics(option.font)
                     elidedText = metrics.elidedText(text, QtCore.Qt.ElideRight, width)
-                    
+
                     # If text is truncated, show tooltip
                     if elidedText != text:
                         QtWidgets.QToolTip.showText(event.globalPos(), text, view)
                     else:
                         QtWidgets.QToolTip.hideText()
-                    
+
                     return True
-                
+
         return super(TextEllipsisDelegate, self).helpEvent(event, view, option, index)
 
 

@@ -50,5 +50,24 @@ class ReadingRepository:
         cursor.close()
         conn.close()
         return new_reading_id
+    
+    def get_reading_id_by_billing_id(self, billing_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT reading_id FROM billing WHERE billing_id = %s", (billing_id,))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result[0] if result else None
+    
+    def void_reading(self, reading_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE reading SET is_voided = true WHERE reading_id = %s", (reading_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+
 
 
