@@ -85,7 +85,27 @@ class TransactionRepository:
         conn.close()
         return result[0] if result else None
 
-    from datetime import date
+    def get_all_transaction_logs(self):
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                           SELECT log_id, transaction_id, action, timestamp, user_name, old_status, new_status
+                           FROM transaction_logs
+                           ORDER BY timestamp DESC
+                           """)
+            logs = cursor.fetchall()
+            return logs
+        except Exception as e:
+            print(f"Error fetching transaction logs: {e}")
+            return []
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+            if 'conn' in locals():
+                conn.close()
+
+    
 
     def update_transaction_status(self, transaction_id, new_status):
         conn = self.get_connection()
@@ -98,3 +118,26 @@ class TransactionRepository:
         """, (new_status, payment_date, transaction_id))
         conn.commit()
         conn.close()
+
+    def create_transaction(self, billing_id, trans_status, trans_payment_date, trans_total_amount,
+                       client_id, reading_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO TRANSACTIONS (
+                BILLING_ID, TRANS_STATUS, TRANS_PAYMENT_DATE, TRANS_TOTAL_AMOUNT,
+                TRANS_CODE, CLIENT_ID, READING_ID
+            ) VALUES (
+                %s, %s, %s, %s,
+                'TR-' || LPAD(nextval('trans_id_seq')::text, 5, '0'), %s, %s
+            )
+            RETURNING TRANS_ID;
+        """, (
+            billing_id, trans_status, trans_payment_date, trans_total_amount,
+            client_id, reading_id
+        ))
+        new_id = cursor.fetchone()
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return new_id
