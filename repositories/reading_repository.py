@@ -28,6 +28,16 @@ class ReadingRepository:
         cursor.close()
         conn.close()
         return reading if reading else None
+    
+    def get_reading_info_by_id(self, reading_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM READING WHERE reading_id = %s", (reading_id,))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result
+
 
     def create_reading(self, read_date, prev_read, pres_read, meter_id):
         conn = self.get_connection()
@@ -59,6 +69,36 @@ class ReadingRepository:
         conn.commit()
         cursor.close()
         conn.close()
+
+    def get_reading_by_current_and_meter(self, current_val, meter_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM READING
+            WHERE reading_current = %s
+            AND meter_id = %s
+            AND is_voided = false
+            ORDER BY reading_date DESC
+            LIMIT 1
+        """, (current_val, meter_id))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result
+    
+    def update_reading(self, reading_id, reading_date, reading_current):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE reading
+            SET reading_date = %s, reading_current = %s
+            WHERE reading_id = %s
+        """, (reading_date, reading_current, reading_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+
 
 
 

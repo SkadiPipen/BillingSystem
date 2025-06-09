@@ -75,6 +75,14 @@ class adminPageBack:
         client = client_repository.get_client_by_id(client_id)
         self.log_action(f"Fetched client by ID: {client_id}")
         return client
+    
+    def update_reading(self, reading_id, reading_date, reading_current):
+        reading_repo = ReadingRepository()
+        return reading_repo.update_reading(reading_id, reading_date, reading_current)
+
+    def get_meter_id_by_reading_id(self, reading_id):
+        meter_repo = MeterRepository()
+        return meter_repo.get_meter_id_by_reading_id(reading_id)
 
     def add_client(self, client_name, client_lname, client_contact_num, client_location, meter_id,
                    address_id, categ_id, client_mname, status):
@@ -193,6 +201,10 @@ class adminPageBack:
         reading_repository = ReadingRepository()
         result = reading_repository.get_reading_by_id(reading_id)
         return result[0] if result else None  # return (reading_prev, reading_current)
+    
+    def get_reading_info_by_id(self, reading_id):
+        reading_repo = ReadingRepository()
+        return reading_repo.get_reading_info_by_id(reading_id)
 
     def get_billing_id(self, billing_code):
         billing_repository = BillingRepository()
@@ -217,6 +229,10 @@ class adminPageBack:
     def update_billing_issued_date(self, billing_id, issued_date):
         billing_repo = BillingRepository()
         return billing_repo.update_billing_issued_date(billing_id, issued_date)
+    
+    def edit_billing(self, billing_id, billing_total, billing_due, sub_capital, late_payment, penalty, total_charge, billing_amount, billing_consumption, billing_date):
+        billing_repo = BillingRepository()
+        return billing_repo.edit_billing(billing_id, billing_total, billing_due, sub_capital, late_payment, penalty, total_charge, billing_amount, billing_consumption, billing_date)
 
 
     def insert_rate_block(self, is_minimum, min_con, max_con, rate, categ_id):
@@ -259,6 +275,10 @@ class adminPageBack:
     def mark_transaction_paid(self, transaction_id, payment_date):
         transaction_repo = TransactionRepository()
         return transaction_repo.mark_transaction_paid(transaction_id, payment_date)
+    
+    def get_reading_by_current_and_meter(self, current_val, meter_id):
+        reading_repo = ReadingRepository()
+        return reading_repo.get_reading_by_current_and_meter(current_val, meter_id)
 
 
     def mark_bill_paid(self, billing_id):
@@ -305,3 +325,6 @@ class adminPageBack:
         conn.commit()
         cursor.close()
         conn.close()
+
+    
+    

@@ -309,10 +309,6 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         title.setAlignment(QtCore.Qt.AlignCenter)
         layout.addWidget(title)
 
-        form_layout = QtWidgets.QGridLayout()
-        form_layout.setHorizontalSpacing(40)
-        form_layout.setVerticalSpacing(20)
-
         input_style = """
             QLineEdit, QDateEdit, QComboBox {
                 font-family: 'Arial';
@@ -337,6 +333,47 @@ class EmployeeBillingPage(QtWidgets.QWidget):
 
         billing_id, billing_due_date, billing_total_amount, cubic_meter_val, reading_id, client_id, categ_id, billing_date, billing_code, billing_status, issued_date, amount_val, subscribe_capital_val, late_payment_val, penalty_val, total_charge_val = existing_data
 
+        backend = adminPageBack()
+        client_info = backend.fetch_client_by_id(client_id)[0]
+        client_name_val = f"{client_info[2]}, {client_info[1]}"
+        client_location_val = client_info[4]
+        meter_number_val = client_info[5]
+        client_categ_id = client_info[7]
+        self.rate_blocks = backend.fetch_rate_blocks_by_categ(client_categ_id)
+
+
+        reading_info = backend.get_reading_info_by_id(reading_id)
+        reading_date_val = reading_info[1]
+        reading_current_val = reading_info[3]  # current reading
+
+        client_location = QtWidgets.QLineEdit(client_location_val)
+        client_location.setStyleSheet(readonly_style)
+        client_location.setReadOnly(True)
+
+        client_name = QtWidgets.QLineEdit(client_name_val)
+        client_name.setStyleSheet(readonly_style)
+        client_name.setReadOnly(True)
+
+        meter_number = QtWidgets.QLineEdit(str(meter_number_val))
+        meter_number.setStyleSheet(readonly_style)
+        meter_number.setReadOnly(True)
+
+        reading_date = QtWidgets.QDateEdit()
+        reading_date.setDate(reading_date_val)
+        reading_date.setCalendarPopup(True)
+        reading_date.setStyleSheet(input_style)
+        reading_date.setReadOnly(False)  # optional, since QDateEdit allows changes
+
+        previous_reading = QtWidgets.QLineEdit(str(reading_info[2]))  # reading_prev
+        previous_reading.setStyleSheet(readonly_style)
+        previous_reading.setReadOnly(True)
+
+
+        current_reading = QtWidgets.QLineEdit(str(reading_current_val))
+        current_reading.setStyleSheet(input_style)
+
+
+
         subscribe_capital = QtWidgets.QLineEdit(str(subscribe_capital_val))
         subscribe_capital.setStyleSheet(input_style)
 
@@ -358,26 +395,72 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         total_bill.setStyleSheet(readonly_style)
         total_bill.setReadOnly(True)
 
+        cubic_meter = QtWidgets.QLineEdit()
+        cubic_meter.setStyleSheet(readonly_style)
+        cubic_meter.setReadOnly(True)
+        cubic_meter.setText(str(cubic_meter_val))
+
+
+
         billing_due = QtWidgets.QDateEdit()
         billing_due.setDate(billing_due_date)
         billing_due.setCalendarPopup(True)
         billing_due.setStyleSheet(input_style)
 
-        # Layout adjustments based on your screenshot
-        form_layout.addWidget(QtWidgets.QLabel("SUBSCRIBE CAPITAL:"), 0, 1)
-        form_layout.addWidget(subscribe_capital, 1, 1)
-        form_layout.addWidget(QtWidgets.QLabel("LATE PAYMENT:"), 2, 1)
-        form_layout.addWidget(late_payment, 3, 1)
-        form_layout.addWidget(QtWidgets.QLabel("PENALTY:"), 4, 1)
-        form_layout.addWidget(penalty, 5, 1)
-        form_layout.addWidget(QtWidgets.QLabel("TOTAL CHARGE:"), 6, 1)
-        form_layout.addWidget(total_charge, 7, 1)
-        form_layout.addWidget(QtWidgets.QLabel("AMOUNT:"), 0, 0)
-        form_layout.addWidget(amount, 1, 0)
-        form_layout.addWidget(QtWidgets.QLabel("TOTAL BILL:"), 2, 0)
-        form_layout.addWidget(total_bill, 3, 0)
-        form_layout.addWidget(QtWidgets.QLabel("DUE DATE:"), 4, 0)
-        form_layout.addWidget(billing_due, 5, 0)
+        form_layout = QtWidgets.QGridLayout()
+        form_layout.setHorizontalSpacing(30)
+        form_layout.setVerticalSpacing(8)
+        form_layout.setColumnStretch(0, 1)  # Left column
+        form_layout.setColumnStretch(1, 1)
+
+        # LEFT COLUMN
+        form_layout.addWidget(QtWidgets.QLabel("CLIENT NAME:"), 0, 0)
+        form_layout.addWidget(client_name, 1, 0)
+
+        form_layout.addWidget(QtWidgets.QLabel("READING DATE:"), 4, 0)
+        form_layout.addWidget(reading_date, 5, 0)
+
+        form_layout.addWidget(QtWidgets.QLabel("PREVIOUS READING:"), 6, 0)
+        form_layout.addWidget(previous_reading, 7, 0)
+
+        form_layout.addWidget(QtWidgets.QLabel("CURRENT READING:"), 8, 0)
+        form_layout.addWidget(current_reading, 9, 0)
+
+        form_layout.addWidget(QtWidgets.QLabel("CUBIC METER CONSUMED:"), 10, 0)
+        form_layout.addWidget(cubic_meter, 11, 0)
+
+        form_layout.addWidget(QtWidgets.QLabel("AMOUNT:"), 12, 0)
+        form_layout.addWidget(amount, 13, 0)
+
+        form_layout.addWidget(QtWidgets.QLabel("DUE DATE:"), 14, 0)
+        form_layout.addWidget(billing_due, 15, 0)
+
+
+        # RIGHT COLUMN
+        additional_label = QtWidgets.QLabel("ADDITIONAL CHARGE")
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setPointSize(11)
+        additional_label.setFont(font)
+        additional_label.setAlignment(QtCore.Qt.AlignCenter)
+        form_layout.addWidget(additional_label, 0, 1, 1, 1)
+
+        form_layout.addWidget(QtWidgets.QLabel("SUBSCRIBE CAPITAL:"), 1, 1)
+        form_layout.addWidget(subscribe_capital, 2, 1)
+
+        form_layout.addWidget(QtWidgets.QLabel("LATE PAYMENT:"), 3, 1)
+        form_layout.addWidget(late_payment, 4, 1)
+
+        form_layout.addWidget(QtWidgets.QLabel("PENALTY:"), 5, 1)
+        form_layout.addWidget(penalty, 6, 1)
+
+        form_layout.addWidget(QtWidgets.QLabel("TOTAL CHARGE:"), 7, 1)
+        form_layout.addWidget(total_charge, 8, 1)
+
+        form_layout.addWidget(QtWidgets.QLabel("TOTAL BILL:"), 9, 1)
+        form_layout.addWidget(total_bill, 10, 1)
+
+
 
         layout.addLayout(form_layout)
 
@@ -412,28 +495,124 @@ class EmployeeBillingPage(QtWidgets.QWidget):
                 total_charge.setText("0.00")
                 total_bill.setText("0.00")
 
+        #realtime update cubic meter consumed
+        def update_cubic_meter():
+            try:
+                prev = float(previous_reading.text())
+                curr = float(current_reading.text())
+                consumed = max(0, curr - prev)
+                cubic_meter.setText(f"{consumed:.2f}")
+            except ValueError:
+                cubic_meter.setText("0.00")
+
+        def on_current_reading_changed():
+            try:
+                prev = float(previous_reading.text())
+                curr = float(current_reading.text())
+
+                if curr < prev:
+                    cubic_meter.setText("0")
+                    amount.setText("0.00")
+                    return
+
+                consumed = curr - prev
+                cubic_meter.setText(str(consumed))
+
+                total_amount = 0
+
+                for block in self.rate_blocks:
+                    is_minimum = block[1]
+                    min_c = block[2]
+                    max_c = block[3] if block[3] is not None else float('inf')
+                    rate = block[4]
+
+                    if is_minimum:
+                        total_amount += rate
+                    elif not is_minimum and consumed >= min_c:
+                        applied_volume = max(0, min(consumed, max_c) - min_c + 1)
+                        total_amount += applied_volume * rate
+
+                amount.setText(f"{total_amount:.2f}")
+                update_total_bill()
+
+            except ValueError:
+                cubic_meter.setText("0")
+                amount.setText("0.00")
+
+        def update_total_bill():
+            try:
+                sub_cap = float(subscribe_capital.text()) if subscribe_capital.text() else 0
+                late_pay = float(late_payment.text()) if late_payment.text() else 0
+                pen = float(penalty.text()) if penalty.text() else 0
+                charge_total = sub_cap + late_pay + pen
+                total_charge.setText(f"{charge_total:.2f}")
+
+                amt = float(amount.text()) if amount.text() else 0
+                total_bill_val = amt + charge_total
+                total_bill.setText(f"{total_bill_val:.2f}")
+            except ValueError:
+                total_charge.setText("0.00")
+                total_bill.setText("0.00")
+
+
+
+
         subscribe_capital.textChanged.connect(update_totals)
         late_payment.textChanged.connect(update_totals)
         penalty.textChanged.connect(update_totals)
+        current_reading.textChanged.connect(update_cubic_meter)
+        current_reading.textChanged.connect(on_current_reading_changed)
+
+
 
         def save_edited_billing():
             backend = adminPageBack()
-            updated_total = float(total_bill.text())
-            updated_due = billing_due.date().toPyDate()
-            backend.update_billing(
-                billing_id, updated_total, updated_due,
-                float(subscribe_capital.text()),
-                float(late_payment.text()),
-                float(penalty.text()),
-                float(total_charge.text())
-            )
-            QtWidgets.QMessageBox.information(dialog, "Updated", "Billing updated successfully.")
-            dialog.accept()
-            self.populate_table(backend.fetch_billing())
+
+            try:
+                updated_total = float(total_bill.text())
+                updated_due = billing_due.date().toPyDate()
+                updated_sub_capital = float(subscribe_capital.text())
+                updated_late_payment = float(late_payment.text())
+                updated_penalty = float(penalty.text())
+                updated_total_charge = float(total_charge.text())
+
+                # ➕ New: Update Reading
+                updated_reading_date = reading_date.date().toPyDate()
+                updated_current_reading = float(current_reading.text())
+                meter_id = backend.get_meter_id_by_reading_id(reading_id)
+
+                # Update reading table (only current reading and date)
+                backend.update_reading(reading_id, updated_reading_date, updated_current_reading)
+
+                # ➕ New: Update meter with current reading and date
+                backend.update_meter_latest_reading(updated_current_reading, updated_reading_date, meter_id)
+
+                # ✅ Update billing table
+                backend.edit_billing(
+                    billing_id,
+                    updated_total,
+                    updated_due,
+                    updated_sub_capital,
+                    updated_late_payment,
+                    updated_penalty,
+                    updated_total_charge,
+                    float(amount.text()),                  # billing_amount
+                    float(cubic_meter.text()),             # billing_consumption
+                    reading_date.date().toPyDate()         # billing_date
+                )
+
+
+                QtWidgets.QMessageBox.information(dialog, "Updated", "Billing and corresponding data updated successfully.")
+                dialog.accept()
+                self.populate_table(backend.fetch_billing())
+
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(dialog, "Error", f"Failed to update billing: {e}")
 
         save_btn.clicked.connect(save_edited_billing)
-
         dialog.exec_()
+
+
 
 
 
@@ -469,13 +648,35 @@ class EmployeeBillingPage(QtWidgets.QWidget):
                 reading_id = backend.get_reading_id_by_billing_id(billing_id)
                 trans_id = backend.get_transaction_id_by_billing_id(billing_id)
 
-                # Mark reading as voided
-                if reading_id:
-                    backend.void_reading(reading_id)
-
                 # Mark transaction as voided
                 if trans_id:
                     backend.update_transaction_status(trans_id, "VOID")
+
+                # Mark reading as voided and update meter with previous reading
+                if reading_id:
+                    reading_info = backend.get_reading_info_by_id(reading_id)
+                    if reading_info:
+                        reading_prev = reading_info[2]      # reading_prev
+                        reading_date = reading_info[1]     # reading_date
+                        meter_id = reading_info[4]         # meter_id
+
+                        backend.void_reading(reading_id)
+                        # Find matching non-voided reading with current = voided reading_prev
+                        matching_reading = backend.get_reading_by_current_and_meter(reading_prev, meter_id)
+
+                        print("matching_reading result:", matching_reading)
+                        print("type:", type(matching_reading))
+
+                        if matching_reading:
+                            # reading_current matched, use its date
+                            updated_reading_date = matching_reading[1]
+                        else:
+                            # fallback: use current reading_date from voided reading
+                            updated_reading_date = reading_date
+
+                        # Now update the meter with adjusted last reading and date
+                        backend.update_meter_latest_reading(reading_prev, updated_reading_date, meter_id)
+
 
                 QtWidgets.QMessageBox.information(self, "Voided", f"Billing {billing_code} and its related data voided successfully.")
                 self.populate_table(backend.fetch_billing())
@@ -708,6 +909,8 @@ class EmployeeBillingPage(QtWidgets.QWidget):
 
     def view_bill(self, billing_data):
 
+        self.last_viewed_bill_data = billing_data
+
         try:
             # Set up base paths
             base_dir = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), ".."))
@@ -791,6 +994,8 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         QThreadPool.globalInstance().start(worker)
 
     def print_bill(self, billing_data):
+
+        self.last_printed_bill_data = billing_data
         
         try:
             # Set up base paths
@@ -836,12 +1041,28 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         self.loading.close()
         self.preview_window = self.ViewBill(merged_pdf_path)
 
-        billing_data = self.filtered_data[(self.current_page - 1) * self.rows_per_page]
-
+        billing_data = self.last_viewed_bill_data
         billing_status = billing_data[7]  # Status column
 
         if billing_status not in ["VOID", "PENDING PAYMENT"]:
-            # Issue Button
+            # ✅ Reprint Button
+            print_btn = QtWidgets.QPushButton("🖨 Reprint")
+            print_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #388E3C;
+                }
+            """)
+            print_btn.clicked.connect(lambda: self.preview_window.print_pdf())
+            self.preview_window.layout().addWidget(print_btn)
+
+            # ✅ Issue Button
             issue_btn = QtWidgets.QPushButton("✅ Issue")
             issue_btn.setStyleSheet("""
                 QPushButton {
@@ -858,7 +1079,7 @@ class EmployeeBillingPage(QtWidgets.QWidget):
             issue_btn.clicked.connect(lambda: self.confirm_issue_bill(self.preview_window, billing_data))
             self.preview_window.layout().addWidget(issue_btn)
 
-            # Void Button
+            # ✅ Void Button
             void_btn = QtWidgets.QPushButton("🚫 Void")
             void_btn.setStyleSheet("""
                 QPushButton {
@@ -875,8 +1096,8 @@ class EmployeeBillingPage(QtWidgets.QWidget):
             void_btn.clicked.connect(lambda: self.confirm_void_bill(self.preview_window, billing_data))
             self.preview_window.layout().addWidget(void_btn)
 
-
         self.preview_window.show()
+
 
 
     def on_view_generated(self, merged_pdf_path):
@@ -952,20 +1173,58 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         reply = QtWidgets.QMessageBox.question(
             preview_window,
             "Confirm Void",
-            f"Are you sure you want to void billing {billing_data[0]}?",
+            f"Are you sure you want to void billing {billing_data[0]} and its associated reading and transaction?",
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
         )
         if reply == QtWidgets.QMessageBox.Yes:
             try:
-                admin = adminPageBack()
-                billing_id = admin.get_billing_id(billing_data[0])
-                admin.update_billing_status(billing_id, "VOID")
+                backend = adminPageBack()
+                billing_code = billing_data[0]
+                billing_id = backend.get_billing_id(billing_code)
 
-                QtWidgets.QMessageBox.information(preview_window, "Voided", f"Billing {billing_data[0]} has been voided.")
-                preview_window.close()  # Only close after successful action
-                self.populate_table(admin.fetch_billing())
+                # Mark billing as VOID
+                backend.update_billing_status(billing_id, "VOID")
+
+                # Get reading_id and transaction_id
+                reading_id = backend.get_reading_id_by_billing_id(billing_id)
+                trans_id = backend.get_transaction_id_by_billing_id(billing_id)
+
+                # Mark transaction as voided
+                if trans_id:
+                    backend.update_transaction_status(trans_id, "VOID")
+
+                # Mark reading as voided and update meter with previous reading
+                if reading_id:
+                    reading_info = backend.get_reading_info_by_id(reading_id)
+                    if reading_info:
+                        reading_prev = reading_info[2]      # reading_prev
+                        reading_date = reading_info[1]     # reading_date
+                        meter_id = reading_info[4]         # meter_id
+
+                        backend.void_reading(reading_id)
+
+                        # Find matching non-voided reading with current = voided reading_prev
+                        matching_reading = backend.get_reading_by_current_and_meter(reading_prev, meter_id)
+
+                        print("matching_reading result:", matching_reading)
+                        print("type:", type(matching_reading))
+
+                        if matching_reading:
+                            # reading_current matched, use its date
+                            updated_reading_date = matching_reading[1]
+                        else:
+                            # fallback: use current reading_date from voided reading
+                            updated_reading_date = reading_date
+
+                        # Update the meter's last reading and date
+                        backend.update_meter_latest_reading(reading_prev, updated_reading_date, meter_id)
+
+                QtWidgets.QMessageBox.information(preview_window, "Voided", f"Billing {billing_code} and its related data voided successfully.")
+                preview_window.close()
+                self.populate_table(backend.fetch_billing())
             except Exception as e:
-                QtWidgets.QMessageBox.critical(preview_window, "Error", f"Failed to void billing: {e}")
+                QtWidgets.QMessageBox.critical(preview_window, "Error", f"Failed to void billing and related data: {e}")
+
 
 
 
@@ -974,6 +1233,9 @@ class EmployeeBillingPage(QtWidgets.QWidget):
     def on_solo_generation_finished(self, merged_pdf_path):
         self.loading.close()
         self.preview_window = self.BillPreview(merged_pdf_path)
+
+        # 🔧 FIX: Get the correct billing data used
+        billing_data = self.last_printed_bill_data  # Store this when you call print_bill()
 
         # Mark as Printed button
         mark_btn = QtWidgets.QPushButton("✅ Mark as Printed")
@@ -989,8 +1251,7 @@ class EmployeeBillingPage(QtWidgets.QWidget):
                 background-color: #2E7D32;
             }
         """)
-        # Only 1 bill passed here
-        mark_btn.clicked.connect(lambda: self.mark_as_printed(self.preview_window, [self.filtered_data[(self.current_page - 1) * self.rows_per_page]]))
+        mark_btn.clicked.connect(lambda: self.mark_as_printed(self.preview_window, [billing_data]))
         
         self.preview_window.layout().addWidget(mark_btn)
         self.preview_window.show()

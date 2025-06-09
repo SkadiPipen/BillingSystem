@@ -196,5 +196,16 @@ class MeterRepository:
                 conn.close()    
 
 
+    def get_meter_id_by_reading_id(self, reading_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT meter_id FROM reading WHERE reading_id = %s", (reading_id,))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result[0] if result else None
+
+
+
         
 
