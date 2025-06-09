@@ -181,6 +181,10 @@ class adminPageBack:
         reading_repository = ReadingRepository()
         return reading_repository.get_reading_by_id(reading_id)  # DO NOT do result[0]
 
+    def get_prev_current_by_id(self, reading_id):
+        reading_repository = ReadingRepository()
+        return reading_repository.get_reading_by_id(reading_id)  # DO NOT do result[0]
+
     # return (reading_prev, reading_current)
 
     def get_billing_id(self, billing_code):

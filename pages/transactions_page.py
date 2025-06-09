@@ -401,7 +401,7 @@ class TransactionsPage(QtWidgets.QWidget):
                 reading_text = "N/A"
                 reading_id = trans[4]
                 if reading_id:
-                    reading = IadminPageBack.get_reading_by_id(reading_id)
+                    reading = IadminPageBack.get_prev_current_by_id(reading_id)
                     if reading and isinstance(reading, (list, tuple)) and len(reading) == 2:
                         prev, curr = reading
                         if prev is not None and curr is not None:
@@ -638,9 +638,7 @@ class TransactionsPage(QtWidgets.QWidget):
             try:
                 reading_text = "N/A"
                 if reading_id:
-                    print(f"Getting reading for ID: {reading_id}")
-                    reading = IadminPageBack.get_reading_by_id(reading_id)
-                    print(f"Result from get_reading_by_id({reading_id}): {reading}")
+                    reading = IadminPageBack.get_prev_current_by_id(reading_id)
 
                     if reading and isinstance(reading, (list, tuple)) and len(reading) == 2:
                         prev, curr = reading

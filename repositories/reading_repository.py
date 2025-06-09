@@ -17,6 +17,26 @@ class ReadingRepository:
         conn.close()
         return readings
 
+    def get_prev_current__by_id(self, reading_id):
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT reading_prev, reading_current
+                FROM READING
+                WHERE reading_id = %s;
+            """, (reading_id,))
+            result = cursor.fetchone()
+            return result  # Tuple like (123, 234)
+        except Exception as e:
+            print(f"[DB ERROR] Failed to get reading: {e}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+            if 'conn' in locals():
+                conn.close()
+
     def get_reading_by_id(self, reading_id):
         try:
             conn = self.get_connection()
