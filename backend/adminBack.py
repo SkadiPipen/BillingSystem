@@ -246,11 +246,19 @@ class adminPageBack:
     def serial_exists(self, serial_number):
         meter_repo = MeterRepository()
         return meter_repo.serial_exists(serial_number)
+    
+    def void_reading(self, reading_id):
+        reading_repo = ReadingRepository()
+        return reading_repo.void_reading(reading_id)
+
+    def get_reading_id_by_billing_id(self, billing_id):
+        reading_repo = ReadingRepository()
+        return reading_repo.get_reading_id_by_billing_id(billing_id)
 
 
-
-
-
+    def mark_transaction_paid(self, transaction_id, payment_date):
+        transaction_repo = TransactionRepository()
+        return transaction_repo.mark_transaction_paid(transaction_id, payment_date)
 
 
     def mark_bill_paid(self, billing_id):

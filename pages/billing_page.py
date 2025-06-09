@@ -7,6 +7,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import sys
 import os
 import math  # Add this import
+from datetime import date
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtPrintSupport import QPrinter, QPrintDialog, QPrintPreviewDialog
@@ -267,7 +268,8 @@ class EmployeeBillingPage(QtWidgets.QWidget):
                 # Get the transaction ID linked to the billing
                 transaction_id = backend.get_transaction_id_by_billing_id(billing_id)
                 if transaction_id:
-                    backend.update_transaction_status(transaction_id, "PAID")
+                    backend.mark_transaction_paid(transaction_id, date.today())
+
 
                 QtWidgets.QMessageBox.information(self, "Success", f"Billing {billing_code} and its transaction marked as PAID.")
                 self.populate_table(backend.fetch_billing())
@@ -451,13 +453,35 @@ class EmployeeBillingPage(QtWidgets.QWidget):
     def void_billing(self, billing_data):
         reply = QtWidgets.QMessageBox.question(
             self, "Confirm Void",
-            f"Are you sure you want to void billing {billing_data[0]}?",
+            f"Are you sure you want to void billing {billing_data[0]} and its associated reading and transaction?",
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
         )
         if reply == QtWidgets.QMessageBox.Yes:
-            adminPageBack().update_billing_status(adminPageBack().get_billing_id(billing_data[0]), "VOID")
-            QtWidgets.QMessageBox.information(self, "Voided", f"Billing {billing_data[0]} voided.")
-            self.populate_table(adminPageBack().fetch_billing())
+            try:
+                backend = adminPageBack()
+                billing_code = billing_data[0]
+                billing_id = backend.get_billing_id(billing_code)
+
+                # Mark billing as VOID
+                backend.update_billing_status(billing_id, "VOID")
+
+                # Get reading_id and transaction_id
+                reading_id = backend.get_reading_id_by_billing_id(billing_id)
+                trans_id = backend.get_transaction_id_by_billing_id(billing_id)
+
+                # Mark reading as voided
+                if reading_id:
+                    backend.void_reading(reading_id)
+
+                # Mark transaction as voided
+                if trans_id:
+                    backend.update_transaction_status(trans_id, "VOID")
+
+                QtWidgets.QMessageBox.information(self, "Voided", f"Billing {billing_code} and its related data voided successfully.")
+                self.populate_table(backend.fetch_billing())
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "Error", f"Failed to void billing and related data: {e}")
+
 
 
 
@@ -1713,6 +1737,7 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         self.filtered_data = data.copy()
         self.current_page = 1  # Reset to first page when data changes
         self.update_pagination()
+        
 
     def filter_table(self):
         search_by = self.search_criteria.currentText()

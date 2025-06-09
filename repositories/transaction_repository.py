@@ -110,14 +110,36 @@ class TransactionRepository:
     def update_transaction_status(self, transaction_id, new_status):
         conn = self.get_connection()
         cursor = conn.cursor()
-        payment_date = date.today()
         cursor.execute("""
             UPDATE TRANSACTIONS 
-            SET TRANS_STATUS = %s, TRANS_PAYMENT_DATE = %s
+            SET TRANS_STATUS = %s
             WHERE TRANS_ID = %s
-        """, (new_status, payment_date, transaction_id))
+        """, (new_status, transaction_id))
         conn.commit()
+        cursor.close()
         conn.close()
+
+    def mark_transaction_paid(self, transaction_id, payment_date):
+        conn = self.get_connection() 
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                UPDATE TRANSACTIONS
+                SET TRANS_STATUS = 'PAID',
+                    TRANS_PAYMENT_DATE = %s
+                WHERE TRANS_ID = %s
+            """, (payment_date, transaction_id))
+            conn.commit()
+        except Exception as e:
+            print(f"Database error in mark_transaction_paid: {e}")
+            conn.rollback()
+        finally:
+            cursor.close()
+            conn.close()
+
+
+
+
 
     def create_transaction(self, billing_id, trans_status, trans_payment_date, trans_total_amount,
                        client_id, reading_id):
