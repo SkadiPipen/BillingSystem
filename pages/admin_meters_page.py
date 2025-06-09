@@ -330,7 +330,20 @@ class AdminMetersPage(QtWidgets.QWidget):
         # Info Label - Display Meter Code
         info_label = QLabel(f"<b>Meter Code:</b> {meter_code}")
         info_label.setStyleSheet("font-size: 16px; padding-bottom: 10px;")
-        layout.addWidget(info_label)
+
+        # Status Filter Dropdown
+        status_filter = QComboBox()
+        status_filter.addItems(["All", "Active", "Voided"])
+        status_filter.setFixedWidth(120)  # Optional: control width
+        status_filter.currentIndexChanged.connect(lambda _: update_table())
+
+        # Horizontal layout to hold info label and dropdown
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(info_label)
+        header_layout.addWidget(status_filter, alignment=Qt.AlignRight)
+        header_layout.addStretch()  # Pushes everything to the left and aligns dropdown properly
+
+        layout.addLayout(header_layout)
 
         if not readings:
             # Show message if no readings
@@ -347,28 +360,49 @@ class AdminMetersPage(QtWidgets.QWidget):
             table.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
             table.setSelectionBehavior(QtWidgets.QTableWidget.SelectRows)
             table.verticalHeader().setVisible(False)
-
-            # Populate table
-            table.setRowCount(len(readings))
-            for row, reading in enumerate(readings):
-                try:
-                    reading_date, prev_reading, current_reading, is_voided = reading
-                    table.setItem(row, 0, QTableWidgetItem(str(reading_date)))
-                    table.setItem(row, 1, QTableWidgetItem(str(prev_reading)))
-                    table.setItem(row, 2, QTableWidgetItem(str(current_reading)))
-
-                    # Set status text and color based on is_voided
-                    status_item = QTableWidgetItem("Voided" if is_voided else "Active")
-                    if is_voided:
-                        status_item.setForeground(QtGui.QColor("red"))  # Red text for voided
-                    else:
-                        status_item.setForeground(QtGui.QColor("green"))  # Green text for active
-                    table.setItem(row, 3, status_item)
-
-                except Exception as e:
-                    print("Error unpacking reading:", reading, e)
-                    continue
             layout.addWidget(table)
+
+            def update_table():
+                """Updates the table based on selected status filter."""
+                selected_status = status_filter.currentText()
+
+                # Filter readings based on status
+                filtered = []
+                for reading in readings:
+                    try:
+                        reading_date, prev_reading, current_reading, is_voided = reading
+                        status = "Voided" if is_voided else "Active"
+                        if selected_status == "All" or status == selected_status:
+                            filtered.append(reading)
+                    except Exception as e:
+                        print("Error unpacking reading:", reading, e)
+                        continue
+
+                # Update table row count
+                table.setRowCount(len(filtered))
+
+                # Populate filtered rows
+                for row, reading in enumerate(filtered):
+                    try:
+                        reading_date, prev_reading, current_reading, is_voided = reading
+                        table.setItem(row, 0, QTableWidgetItem(str(reading_date)))
+                        table.setItem(row, 1, QTableWidgetItem(str(prev_reading)))
+                        table.setItem(row, 2, QTableWidgetItem(str(current_reading)))
+
+                        # Set status text and color based on is_voided
+                        status_item = QTableWidgetItem("Voided" if is_voided else "Active")
+                        if is_voided:
+                            status_item.setForeground(QtGui.QColor("red"))  # Red text for voided
+                        else:
+                            status_item.setForeground(QtGui.QColor("green"))  # Green text for active
+                        table.setItem(row, 3, status_item)
+
+                    except Exception as e:
+                        print("Error displaying reading:", reading, e)
+                        continue
+
+            # Initial population of the table
+            update_table()
 
         # Close button
         close_btn = QPushButton("Close")
