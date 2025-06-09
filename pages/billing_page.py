@@ -2231,13 +2231,13 @@ class EmployeeBillingPage(QtWidgets.QWidget):
             # Add action cell with print button
             self.create_action_cell(i, billing)
 
-
     def populate_table(self, data):
-        # Update all data and repopulate
+        # Update all data
         self.all_data = data
         self.filtered_data = data.copy()
-        self.current_page = 1  # Reset to first page when data changes
-        self.update_pagination()
+
+        # Reapply current filter and search
+        self.filter_table()
         
 
     def filter_table(self):
