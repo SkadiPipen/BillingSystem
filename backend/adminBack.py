@@ -362,6 +362,81 @@ class adminPageBack:
         finally:
             if conn:
                 cursor.close()
+                conn.close()    
+
+    def delete_billing(self, billing_code):
+        conn = None
+        try:
+            db = DBConnector()
+            conn = db.get_connection()
+            cursor = conn.cursor()
+
+            # Get billing ID from code
+            cursor.execute("SELECT billing_id FROM billing WHERE billing_code = %s", (billing_code,))
+            result = cursor.fetchone()
+            if not result:
+                raise Exception(f"No billing found with code {billing_code}")
+            billing_id = result[0]
+
+            # Get associated reading_id
+            cursor.execute("SELECT reading_id FROM billing WHERE billing_id = %s", (billing_id,))
+            reading_result = cursor.fetchone()
+            if not reading_result:
+                raise Exception(f"No reading found linked to billing ID {billing_id}")
+            reading_id = reading_result[0]
+
+            # Get reading details before deletion
+            cursor.execute("""
+                           SELECT meter_id, reading_prev, reading_current, reading_date
+                           FROM reading
+                           WHERE reading_id = %s
+                           """, (reading_id,))
+            reading_info = cursor.fetchone()
+            if not reading_info:
+                raise Exception(f"Reading data missing for ID {reading_id}")
+            meter_id, prev_reading, current_reading, reading_date = reading_info
+
+            # Delete billing and reading records
+            cursor.execute("DELETE FROM billing WHERE billing_id = %s", (billing_id,))
+            cursor.execute("DELETE FROM reading WHERE reading_id = %s", (reading_id,))
+
+            # Find latest non-deleted reading
+            cursor.execute("""
+                           SELECT reading_current, reading_date
+                           FROM reading
+                           WHERE meter_id = %s
+                             AND reading_date < %s
+                           ORDER BY reading_date DESC LIMIT 1
+                           """, (meter_id, reading_date))
+            last_reading = cursor.fetchone()
+
+            # Determine fallback values
+            if last_reading:
+                last_value, last_date = last_reading
+            else:
+                last_value = prev_reading
+                last_date = reading_date
+
+            # Update meter with previous reading
+            cursor.execute("""
+                           UPDATE meter
+                           SET meter_last_reading      = %s,
+                               meter_last_reading_date = %s
+                           WHERE meter_id = %s
+                           """, (last_value, last_date, meter_id))
+
+            conn.commit()
+            print(f"[SUCCESS] Billing {billing_code} deleted successfully.")
+
+        except Exception as e:
+            conn.rollback()
+            print(f"[ERROR] Failed to delete billing: {str(e)}")
+            raise Exception(f"Failed to delete billing: {str(e)}")
+
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
                 conn.close()
 
     

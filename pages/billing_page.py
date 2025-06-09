@@ -612,11 +612,6 @@ class EmployeeBillingPage(QtWidgets.QWidget):
         save_btn.clicked.connect(save_edited_billing)
         dialog.exec_()
 
-
-
-
-
-
     def delete_billing(self, billing_data):
         reply = QtWidgets.QMessageBox.question(
             self, "Confirm Deletion",
@@ -624,9 +619,13 @@ class EmployeeBillingPage(QtWidgets.QWidget):
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
         )
         if reply == QtWidgets.QMessageBox.Yes:
-            adminPageBack().delete_billing(billing_data[0])
-            QtWidgets.QMessageBox.information(self, "Deleted", f"Billing {billing_data[0]} deleted.")
-            self.populate_table(adminPageBack().fetch_billing())
+            try:
+                adminPageBack().delete_billing(billing_data[0])
+                QtWidgets.QMessageBox.information(self, "Deleted",
+                                                  f"Billing {billing_data[0]} and its related reading were deleted.")
+                self.populate_table(adminPageBack().fetch_billing())
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "Error", f"Failed to delete billing: {e}")
 
 
     def void_billing(self, billing_data):
