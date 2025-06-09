@@ -201,6 +201,10 @@ class adminPageBack:
         reading_repository = ReadingRepository()
         result = reading_repository.get_reading_by_id(reading_id)
         return result[0] if result else None  # return (reading_prev, reading_current)
+
+    def get_prev_current_by_id(self, reading_id):
+        reading_repository = ReadingRepository()
+        return reading_repository.get_reading_by_id(reading_id)  # DO NOT do result[0]
     
     def get_reading_info_by_id(self, reading_id):
         reading_repo = ReadingRepository()

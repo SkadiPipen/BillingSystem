@@ -397,13 +397,26 @@ class TransactionsPage(QtWidgets.QWidget):
             except:
                 continue
 
+            # Get reading display text (like in populate_table)
+            try:
+                reading_text = "N/A"
+                reading_id = trans[4]
+                if reading_id:
+                    reading = IadminPageBack.get_prev_current_by_id(reading_id)
+                    if reading and isinstance(reading, (list, tuple)) and len(reading) == 2:
+                        prev, curr = reading
+                        if prev is not None and curr is not None:
+                            reading_text = f"Prev: {float(prev):,.2f}<br>Current: {float(curr):,.2f}"
+            except Exception as e:
+                reading_text = "Error"
+
             html += f"""
             <tr>
               <td>{trans[0]}</td>
               <td>{trans[1]}</td>
               <td>{trans[2]}</td>
               <td>{trans[3]}</td>
-              <td>{trans[4]}</td>
+              <td>{reading_text}</td>
               <td>{trans[7]}</td>
               <td align="right">{con:,.2f}</td>
               <td>{status.title()}</td>
@@ -622,10 +635,23 @@ class TransactionsPage(QtWidgets.QWidget):
 
             # Get reading text
             try:
-                reading = IadminPageBack.get_reading_by_id(reading_id)
-                reading_text = f"Previous: {reading[0]:,.2f}\nCurrent: {reading[1]:,.2f}" if reading else "N/A"
+                reading_text = "N/A"
+                if reading_id:
+                    reading = IadminPageBack.get_prev_current_by_id(reading_id)
+
+                    if reading and isinstance(reading, (list, tuple)) and len(reading) == 2:
+                        prev, curr = reading
+                        if prev is not None and curr is not None:
+                            reading_text = f"Previous: {float(prev):,.2f}\nCurrent: {float(curr):,.2f}"
+                        else:
+                            reading_text = "N/A"
+                    else:
+                        reading_text = "N/A"
             except Exception as e:
+                print(f"Reading fetch error for ID {reading_id}: {e}")
                 reading_text = "Error"
+
+            self.create_scrollable_cell(table_row, 4, reading_text)
 
             # Display date logic
             status_str = str(trans_status).strip().upper() if trans_status else ""
@@ -636,7 +662,7 @@ class TransactionsPage(QtWidgets.QWidget):
             self.create_scrollable_cell(table_row, 1, str(payment_display))
             self.create_scrollable_cell(table_row, 2, str(client_number))
             self.create_scrollable_cell(table_row, 3, str(client_name))
-            self.create_scrollable_cell(table_row, 4, reading_text)
+
             self.create_scrollable_cell(table_row, 5, str(billing_due))  # DUE DATE here
             self.create_scrollable_cell(table_row, 6,
                                         f"{float(billing_consumption):,.2f}" if billing_consumption else "0.00")  # CONSUMPTION
