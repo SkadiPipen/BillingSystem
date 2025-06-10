@@ -119,10 +119,10 @@ class ClientRepository:
                 (new_status, client_id)
             )
             conn.commit()
-            return True  # ✅ Add this line
+            return True
         except Exception as e:
             print("Database Error:", e)
-            return False  # ✅ Optional for error handling
+            return False
         finally:
             cursor.close()
             conn.close()        

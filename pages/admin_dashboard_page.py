@@ -262,27 +262,27 @@ class AdminDashboardPage(QtWidgets.QWidget):
                         QtGui.QFont("Arial", 9, QtGui.QFont.Bold))
                     slice_.setLabel(f"₱{slice_.value():,.0f}")  # Show only the amount
                     slice_.setLabelVisible(True)
-                    slice_.setLabelArmLengthFactor(0.15)
+                    slice_.setLabelArmLengthFactor(0.05)
             else:
                 # For Monthly chart, show both "PAID" and "PENDING"
+                series = QPieSeries()
+                series.setPieSize(0.7)
                 series.append("PAID", completed_total)
                 series.append("PENDING", pending_total)
-
                 colors = [QtGui.QColor("#4CAF50"), QtGui.QColor("#FFA726")]
-                slices = series.slices()
+
                 slices = series.slices()
                 for i, slice_ in enumerate(slices):
                     slice_.setBrush(colors[i])
                     total = completed_total + pending_total
                     if total > 0:
                         percent = (slice_.value() / total) * 100
-                        # Set label format
-                        slice_.setLabel(f"₱{slice_.value():,.0f}\n({percent:.1f}%)")
+                        label_text = f"₱{slice_.value():,.0f}\n({percent:.1f}%)"
+                        slice_.setLabel(label_text)
                         slice_.setLabelVisible(True)
-                        slice_.setLabelFont(
-                            QtGui.QFont("Arial", 9, QtGui.QFont.Bold))  # Make font bold for better visibility
-                        slice_.setLabelArmLengthFactor(0.15)  # Longer arm for better label placement
-                        slice_.setExploded(i == 1)  # Optional: Explode PENDING slice slightly
+                        slice_.setLabelFont(QtGui.QFont("Arial", 9, QtGui.QFont.Bold))
+                        slice_.setLabelArmLengthFactor(0.05)
+                        slice_.setExploded(i == 1)  # Explode PENDING slice slightly
 
             chart = QChart()
             chart.addSeries(series)
@@ -290,12 +290,12 @@ class AdminDashboardPage(QtWidgets.QWidget):
             chart.legend().hide()
             chart.setMargins(QtCore.QMargins(10, 10, 10, 10))
             chart.setBackgroundVisible(False)
-            chart.setMinimumSize(QtCore.QSizeF(200, 160))
+            chart.setMinimumSize(QtCore.QSizeF(180, 140))
             chart.setAnimationOptions(QChart.SeriesAnimations)
 
             chart_view = QChartView(chart)
             chart_view.setRenderHint(QtGui.QPainter.Antialiasing)
-            chart_view.setMinimumSize(QtCore.QSize(200, 160))
+            chart_view.setMinimumSize(QtCore.QSize(180, 140))
 
             layout.addWidget(chart_view)
 

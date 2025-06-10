@@ -305,7 +305,7 @@ class AdminCustomersPage(QtWidgets.QWidget):
         self.next_page_btn.setEnabled(self.current_page < self.total_pages)
         self.last_page_btn.setEnabled(self.current_page < self.total_pages)
 
-        # Update table with current page data
+        # Only update visible data on the current page, avoid full table refresh
         self.populate_table(self.all_customers_data)
 
     def is_row_filtered(self, row_index):
@@ -388,7 +388,7 @@ class AdminCustomersPage(QtWidgets.QWidget):
                 if start_index <= visible_row_counter <= end_index:
                     rows_to_show.append(customer)
 
-        # Set row count for visible rows on current page
+        # Set row count for visible rows on the current page
         self.customers_table.setRowCount(len(rows_to_show))
 
         # Populate only the rows that should be visible on this page
@@ -488,12 +488,13 @@ class AdminCustomersPage(QtWidgets.QWidget):
         if container:
             toggle_button = container.findChild(QtWidgets.QPushButton)
             if toggle_button:
-                # Get client_id from customer data
+                # Get the actual client_id by calculating the index based on pagination
+                # Map the row to the real index in the full data set
                 visible_index = 0
                 selected_customer = None
                 for idx, customer in enumerate(self.all_customers_data):
-                    if not self.is_row_filtered(idx):
-                        if visible_index == row:
+                    if not self.is_row_filtered(idx):  # Ensure it's not filtered
+                        if visible_index == row:  # Check if this is the current visible row
                             selected_customer = customer
                             break
                         visible_index += 1
@@ -506,7 +507,7 @@ class AdminCustomersPage(QtWidgets.QWidget):
                 current_status = selected_customer[10].capitalize()  # Ensure case for enum
                 next_status = 'Inactive' if current_status == 'Active' else 'Active'
 
-                toggle_button.blockSignals(True)
+                toggle_button.blockSignals(True)  # Prevent signal while updating status
 
                 reply = QMessageBox.question(
                     self,
@@ -516,17 +517,18 @@ class AdminCustomersPage(QtWidgets.QWidget):
                 )
 
                 if reply == QMessageBox.Yes:
+                    # Update the status in the backend
                     self.IadminPageBack.update_client_status(client_id, next_status)
                     label.setText(next_status)
                     label.setStyleSheet(
                         f"color: {'#4CAF50' if next_status == 'Active' else '#E57373'}; font-weight: bold;")
                     toggle_button.setChecked(next_status == "Active")
+                    self.all_customers_data = self.IadminPageBack.fetch_clients()  # Refresh the data
+                    self.update_pagination()  # Reapply pagination and filtering after update
                 else:
                     toggle_button.setChecked(current_status == "Active")
 
-                toggle_button.blockSignals(False)
-
-
+                toggle_button.blockSignals(False)  # Re-enable signals after update
 
     def show_add_customer_page(self):
         add_dialog = QtWidgets.QDialog(self)
