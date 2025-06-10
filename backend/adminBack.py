@@ -487,5 +487,38 @@ class adminPageBack:
             if conn:
                 conn.close()
 
+    def fetch_transaction(self):
+        try:
+            db = DBConnector()
+            conn = db.get_connection()
+            cursor = conn.cursor()
+            query = """
+                    SELECT t.TRANS_CODE, 
+                           t.TRANS_PAYMENT_DATE, 
+                           c.CLIENT_NUMBER, 
+                           c.CLIENT_NAME, 
+                           t.READING_ID, 
+                           b.BILLING_CONSUMPTION, 
+                           b.BILLING_TOTAL, 
+                           b.BILLING_DUE, 
+                           t.TRANS_STATUS, 
+                           r.READING_DATE
+                    FROM TRANSACTIONS AS t
+                             JOIN CLIENT AS c ON t.CLIENT_ID = c.CLIENT_ID
+                             JOIN BILLING AS b ON t.BILLING_ID = b.BILLING_ID
+                             LEFT JOIN READING AS r ON t.READING_ID = r.READING_ID
+                    ORDER BY t.TRANS_ID ASC 
+                    """
+            cursor.execute(query)
+            return cursor.fetchall()
+        except Exception as e:
+            print(f"Database error: {e}")
+            return []
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+            if 'conn' in locals():
+                conn.close()
+
     
     

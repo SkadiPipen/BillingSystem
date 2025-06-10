@@ -1,12 +1,16 @@
 import warnings
+
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import sys
 import os
+from datetime import datetime, date
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtChart import QChart, QChartView, QPieSeries, QPieSlice
 from backend.adminBack import adminPageBack
+
 
 class AdminDashboardPage(QtWidgets.QWidget):
     def __init__(self, username=None):
@@ -14,12 +18,10 @@ class AdminDashboardPage(QtWidgets.QWidget):
         self.parent = None
         self.username = username if username else "System"
         self.backend = adminPageBack(self.username)
-        self.sample_data = [
-            ("TR001", "Alice Brown", "₱50", "John Doe", "2023-10-15", "COMPLETED"),
-            ("TR002", "Charlie Davis", "₱50", "John Doe", "2023-10-15", "PENDING"),
-            ("TR003", "Eve Franklin", "₱50", "John Doe", "2023-10-15", "FAILED"),
-            ("TR004", "George Harris", "₱50", "John Doe", "2023-10-15", "COMPLETED"),
-        ]
+
+        # Fetch live transactions
+        self.transactions = self.backend.fetch_transaction()  # Ensure this returns a list of tuples
+
         self.setup_ui()
 
     def get_client_stats(self):
@@ -37,6 +39,10 @@ class AdminDashboardPage(QtWidgets.QWidget):
                     item.widget().deleteLater()
                 elif item.layout():
                     clear_layout(item.layout())
+
+        # === Re-fetch live data ===
+        self.transactions = self.backend.fetch_transaction()  # Refresh transactions
+        # ==========================
 
         clear_layout(self.content_layout)
         self.populate_dashboard_content()
@@ -91,9 +97,22 @@ class AdminDashboardPage(QtWidgets.QWidget):
         inactive_card = self.create_stat_card("Inactive", str(inactive_clients), "../images/not-active.png")
         stats_grid.addWidget(inactive_card, 0, 3)
 
-        total_billed = sum(float(trans_amount.replace('₱', ''))
-                          for _, _, trans_amount, _, _, _ in self.sample_data)
-        billed_card = self.create_stat_card("Total Billed Amount", f"₱{total_billed:,.2f}", "../images/bill.png")
+        # Calculate dynamic total billed amount
+        total_billed = 0.0
+        for trans in self.transactions:
+            try:
+                status = trans[8].upper()  # Assuming status is at index 8
+                billing_total = float(trans[6])  # billing_total at index 6
+                if status in ("PAID", "PENDING"):
+                    total_billed += billing_total
+            except (IndexError, ValueError, TypeError):
+                continue
+
+        billed_card = self.create_stat_card(
+            "Total Billed Amount",
+            f"₱{total_billed:,.2f}",
+            "../images/bill.png"
+        )
         stats_grid.addWidget(billed_card, 0, 4)
 
         self.content_layout.addLayout(stats_grid)
@@ -102,8 +121,8 @@ class AdminDashboardPage(QtWidgets.QWidget):
         charts_layout = QtWidgets.QHBoxLayout(charts_container)
         charts_layout.setSpacing(20)
 
-        daily_chart = self.create_revenue_chart("Daily Revenue")
-        monthly_chart = self.create_revenue_chart("Monthly Revenue")
+        daily_chart = self.create_revenue_chart("Daily Revenue", self.transactions)
+        monthly_chart = self.create_revenue_chart("Monthly Revenue", self.transactions)
 
         charts_layout.addWidget(daily_chart, 1)
         charts_layout.addWidget(monthly_chart, 1)
@@ -159,81 +178,145 @@ class AdminDashboardPage(QtWidgets.QWidget):
         card.setMinimumSize(200, 150)
         return card
 
-    def create_revenue_chart(self, title):
+    def create_revenue_chart(self, title, transactions):
         container = QtWidgets.QFrame()
         container.setStyleSheet("""
             QFrame {
                 background-color: #C9EBCB;
                 border-radius: 10px;
-                padding: 15px;
+                padding: 5px;
             }
         """)
         layout = QtWidgets.QVBoxLayout(container)
-
         title_label = QtWidgets.QLabel(title)
         title_label.setStyleSheet("""
             font-family: 'Montserrat', sans-serif;
             font-size: 18px;
             font-weight: bold;
             color: #333;
-            padding-bottom: 10px;
+            padding-bottom: 2px;
         """)
         layout.addWidget(title_label)
 
-        series = QPieSeries()
+        today = QtCore.QDate.currentDate().toString("yyyy-MM-dd")
+        completed_total = 0.0
+        pending_total = 0.0
 
-        if "Daily" in title:
-            completed = sum(float(amount.replace('₱', ''))
-                          for _, _, amount, _, date, status in self.sample_data
-                          if status == "COMPLETED" and date == "2023-10-15")
-            pending = sum(float(amount.replace('₱', ''))
-                        for _, _, amount, _, date, status in self.sample_data
-                        if status == "PENDING" and date == "2023-10-15")
+        for trans in transactions:
+            try:
+                status = trans[8].upper()
+                raw_date = trans[1]
+                try:
+                    if isinstance(raw_date, QtCore.QDate):
+                        payment_date = raw_date.toString("yyyy-MM-dd")
+                    elif isinstance(raw_date, datetime):
+                        payment_date = raw_date.strftime("%Y-%m-%d")
+                    elif isinstance(raw_date, date):  # Handle date-only objects
+                        payment_date = raw_date.strftime("%Y-%m-%d")
+                    elif isinstance(raw_date, str):
+                        try:
+                            cleaned = raw_date.strip().split()[0]
+                            parsed = datetime.strptime(cleaned, "%Y-%m-%d")
+                            payment_date = parsed.strftime("%Y-%m-%d")
+                        except ValueError as ve:
+                            payment_date = ""
+                    else:
+                        payment_date = ""
+                except Exception as e:
+                    payment_date = ""
+                amount = float(trans[6])  # billing_total at index 6
+            except Exception:
+                continue
+
+            is_today = (payment_date == today)
+
+            if "Daily" in title:
+                if status == "PAID" and is_today:
+                    completed_total += amount
+                else:
+                    print(f"Ignored transaction {trans[0]} because status={status} or not today.")
+            else:
+                if status == "PAID":
+                    completed_total += amount
+                elif status == "PENDING":
+                    pending_total += amount
+
+        # Check if it's Daily chart and has no data
+        if "Daily" in title and completed_total == 0:
+            no_data_label = QtWidgets.QLabel("No data available for today.")
+            no_data_label.setAlignment(QtCore.Qt.AlignCenter)
+            no_data_label.setStyleSheet("font-size: 14px; color: #999;")
+            layout.addWidget(no_data_label)
         else:
-            completed = sum(float(amount.replace('₱', ''))
-                          for _, _, amount, _, _, status in self.sample_data
-                          if status == "COMPLETED")
-            pending = sum(float(amount.replace('₱', ''))
-                        for _, _, amount, _, _, status in self.sample_data
-                        if status == "PENDING")
+            series = QPieSeries()
 
-        completed_slice = QPieSlice("Completed", completed)
-        pending_slice = QPieSlice("Pending", pending)
+            if "Daily" in title:
+                # For Daily chart, only show "PAID" transactions
+                series.append("PAID", completed_total)
 
-        series.append(completed_slice)
-        series.append(pending_slice)
+                # Set color for "PAID"
+                colors = [QtGui.QColor("#4CAF50")]  # Green for PAID
+                for slice_, color in zip(series.slices(), colors):
+                    slice_.setBrush(color)
+                    slice_.setLabelFont(
+                        QtGui.QFont("Arial", 9, QtGui.QFont.Bold))
+                    slice_.setLabel(f"₱{slice_.value():,.0f}")  # Show only the amount
+                    slice_.setLabelVisible(True)
+                    slice_.setLabelArmLengthFactor(0.15)
+            else:
+                # For Monthly chart, show both "PAID" and "PENDING"
+                series.append("PAID", completed_total)
+                series.append("PENDING", pending_total)
 
-        completed_slice.setBrush(QtGui.QColor("#4CAF50"))
-        pending_slice.setBrush(QtGui.QColor("#FFA726"))
+                colors = [QtGui.QColor("#4CAF50"), QtGui.QColor("#FFA726")]
+                slices = series.slices()
+                slices = series.slices()
+                for i, slice_ in enumerate(slices):
+                    slice_.setBrush(colors[i])
+                    total = completed_total + pending_total
+                    if total > 0:
+                        percent = (slice_.value() / total) * 100
+                        # Set label format
+                        slice_.setLabel(f"₱{slice_.value():,.0f}\n({percent:.1f}%)")
+                        slice_.setLabelVisible(True)
+                        slice_.setLabelFont(
+                            QtGui.QFont("Arial", 9, QtGui.QFont.Bold))  # Make font bold for better visibility
+                        slice_.setLabelArmLengthFactor(0.15)  # Longer arm for better label placement
+                        slice_.setExploded(i == 1)  # Optional: Explode PENDING slice slightly
 
-        total = completed + pending
-        if total > 0:
-            completed_slice.setLabel(f"₱{completed:,.0f}\n({completed/total*100:.1f}%)")
-            pending_slice.setLabel(f"₱{pending:,.0f}\n({pending/total*100:.1f}%)")
-            completed_slice.setLabelVisible(True)
-            pending_slice.setLabelVisible(True)
-            completed_slice.setLabelArmLengthFactor(0.35)
-            pending_slice.setLabelArmLengthFactor(0.35)
-        else:
-            completed_slice.setLabel("No\nRevenue")
-            pending_slice.setLabel("")
+            chart = QChart()
+            chart.addSeries(series)
+            chart.setTitle("")
+            chart.legend().hide()
+            chart.setMargins(QtCore.QMargins(10, 10, 10, 10))
+            chart.setBackgroundVisible(False)
+            chart.setMinimumSize(QtCore.QSizeF(200, 160))
+            chart.setAnimationOptions(QChart.SeriesAnimations)
 
-        chart = QChart()
-        chart.addSeries(series)
-        chart.setTitle("")
-        chart.legend().hide()
-        chart.setMargins(QtCore.QMargins(10, 10, 10, 10))
-        chart.setAnimationOptions(QChart.SeriesAnimations)
-        chart.layout().setContentsMargins(0, 0, 0, 0)
-        chart.setBackgroundVisible(False)
-        chart.setMinimumSize(QtCore.QSizeF(250, 200))
+            chart_view = QChartView(chart)
+            chart_view.setRenderHint(QtGui.QPainter.Antialiasing)
+            chart_view.setMinimumSize(QtCore.QSize(200, 160))
 
-        chart_view = QChartView(chart)
-        chart_view.setRenderHint(QtGui.QPainter.Antialiasing)
-        chart_view.setMinimumSize(QtCore.QSize(250, 200))
+            layout.addWidget(chart_view)
 
-        layout.addWidget(chart_view)
+            # === Add Custom Legend Below Chart ===
+            legend_layout = QtWidgets.QHBoxLayout()
+            paid_legend = QtWidgets.QLabel("🟩 PAID")
+            paid_legend.setStyleSheet("font-size: 12px; color: black;")
+            legend_layout.addWidget(paid_legend)
+
+            # For Daily chart, remove the "PENDING" legend
+            if "Daily" not in title:
+                pending_legend = QtWidgets.QLabel("🟨 PENDING")
+                pending_legend.setStyleSheet("font-size: 12px; color: black;")
+                legend_layout.addWidget(pending_legend)
+
+            legend_layout.addStretch()
+            layout.addLayout(legend_layout)
+            # =====================================
+
         return container
+
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
